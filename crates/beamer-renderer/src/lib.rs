@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! `pdfium-render` およびローカル TeX コマンドの非同期実行を管理するクレート。
+//!
+//! PDF のページラスタライズ、TeX コンパイルプロセスの監視、エラーハンドリングを担当する。
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod error;
+pub mod pdf;
+pub mod tex;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use error::{RenderError, Result};
+pub use pdf::{PageBitmap, PdfRasterizer, RenderDpi};
+pub use tex::{CompileOutput, TexRunner};
