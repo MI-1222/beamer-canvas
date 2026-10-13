@@ -1,3 +1,7 @@
+//! Beamer Editor アプリケーションのエントリポイント。
+
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 fn main() {
-    println!("Hello, world!");
+    beamer_editor_app::run();
 }

@@ -117,6 +117,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "beamer-editor-app"
+version = "0.1.0"
+dependencies = [
+ "beamer-core",
+ "beamer-git",
+ "beamer-parser",
+ "beamer-renderer",
+ "tauri",
+ "tauri-build",
+]
+
+[[package]]
 name = "beamer-git"
 version = "0.1.0"
 dependencies = [
@@ -3147,18 +3159,6 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
-]
-
-[[package]]
-name = "src-tauri"
-version = "0.1.0"
-dependencies = [
- "beamer-core",
- "beamer-git",
- "beamer-parser",
- "beamer-renderer",
- "tauri",
- "tauri-build",
 ]
 
 [[package]]

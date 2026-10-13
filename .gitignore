@@ -1,1 +1,7 @@
 /target
+
+# Tauri v2 自動生成スキーマ
+/src-tauri/gen/schemas/
+
+# macOS
+.DS_Store
