@@ -6,8 +6,10 @@ pub mod cursor;
 pub mod lexer;
 pub mod parser;
 pub mod syntax;
+pub mod token_source;
 
 pub use cursor::Cursor;
 pub use lexer::{Lexer, Token, tokenize};
 pub use parser::{BeamerParser, ParseResult};
 pub use syntax::{LatexLanguage, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
+pub use token_source::TokenSource;
