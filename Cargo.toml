@@ -1,6 +1,10 @@
-[package]
-name = "beamer-editor"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "3"
+members = [
+    "crates/beamer-parser",
+    "crates/beamer-core",
+    "crates/beamer-renderer",
+    "crates/beamer-git",
+    "src-tauri",
+]
 
-[dependencies]

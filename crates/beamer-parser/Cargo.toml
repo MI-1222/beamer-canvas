@@ -1,0 +1,8 @@
+[package]
+name = "beamer-parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+beamer-core = { version = "0.1.0", path = "../beamer-core" }
+rowan = "0.17.0"

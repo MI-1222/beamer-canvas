@@ -1,0 +1,9 @@
+[package]
+name = "beamer-git"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+beamer-core = { version = "0.1.0", path = "../beamer-core" }
+git2 = "0.21.0"
+thiserror = "2.0.21"
