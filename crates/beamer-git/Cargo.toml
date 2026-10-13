@@ -7,3 +7,6 @@ edition = "2024"
 beamer-core = { version = "0.1.0", path = "../beamer-core" }
 git2 = "0.21.0"
 thiserror = "2.0.21"
+
+[dev-dependencies]
+tempfile = "3.27.0"
