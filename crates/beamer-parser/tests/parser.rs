@@ -219,3 +219,207 @@ $x + y =
     assert!(result.preamble().is_some());
     assert!(result.document_body().is_some());
 }
+
+#[test]
+fn test_parse_section_and_subsection_nodes() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\section{イントロダクション}
+\section[略称]{正式セクション名}
+\subsection{背景と目的}
+\section*{目次非掲載セクション}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // ラウンドトリップ完全一致を検証する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let sections = result.sections();
+    assert_eq!(sections.len(), 4);
+
+    // 1. `\section{イントロダクション}`
+    let s0 = beamer_parser::SectionNode::new(&sections[0]).expect("SectionNode である。");
+    assert!(!s0.is_subsection());
+    assert_eq!(s0.title_text().as_deref(), Some("イントロダクション"));
+    assert_eq!(s0.options_text(), None);
+
+    // 2. `\section[略称]{正式セクション名}`
+    let s1 = beamer_parser::SectionNode::new(&sections[1]).expect("SectionNode である。");
+    assert!(!s1.is_subsection());
+    assert_eq!(s1.title_text().as_deref(), Some("正式セクション名"));
+    assert_eq!(s1.options_text().as_deref(), Some("略称"));
+
+    // 3. `\subsection{背景と目的}`
+    let s2 = beamer_parser::SectionNode::new(&sections[2]).expect("SectionNode である。");
+    assert!(s2.is_subsection());
+    assert_eq!(s2.title_text().as_deref(), Some("背景と目的"));
+
+    // 4. `\section*{目次非掲載セクション}`
+    let s3 = beamer_parser::SectionNode::new(&sections[3]).expect("SectionNode である。");
+    assert!(!s3.is_subsection());
+    assert_eq!(s3.title_text().as_deref(), Some("目次非掲載セクション"));
+}
+
+#[test]
+fn test_parse_frame_environment_with_header_variations() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}<1->[plain,t]{スライドタイトル}{サブタイトル}
+  スライド本文 1
+\end{frame}
+
+\begin{frame}[fragile]{コード解説}
+  \begin{verbatim}
+  println!("Hello");
+  \end{verbatim}
+\end{frame}
+
+\begin{frame}{タイトルのみ}
+  本文 3
+\end{frame}
+
+\begin{frame}
+  \frametitle{本文内タイトルコマンド}
+  本文 4
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 4);
+
+    // 1. `<1->[plain,t]{スライドタイトル}{サブタイトル}`
+    let f0 = beamer_parser::FrameNode::new(&frames[0]).expect("FrameNode である。");
+    assert_eq!(f0.overlay_spec_text().as_deref(), Some("1-"));
+    assert_eq!(f0.options_text().as_deref(), Some("plain,t"));
+    assert_eq!(f0.title_text().as_deref(), Some("スライドタイトル"));
+    assert_eq!(f0.subtitle_text().as_deref(), Some("サブタイトル"));
+
+    // 2. `[fragile]{コード解説}`
+    let f1 = beamer_parser::FrameNode::new(&frames[1]).expect("FrameNode である。");
+    assert_eq!(f1.overlay_spec_text(), None);
+    assert_eq!(f1.options_text().as_deref(), Some("fragile"));
+    assert_eq!(f1.title_text().as_deref(), Some("コード解説"));
+    assert_eq!(f1.subtitle_text(), None);
+
+    // 3. `{タイトルのみ}`
+    let f2 = beamer_parser::FrameNode::new(&frames[2]).expect("FrameNode である。");
+    assert_eq!(f2.options_text(), None);
+    assert_eq!(f2.title_text().as_deref(), Some("タイトルのみ"));
+
+    // 4. `\frametitle{本文内タイトルコマンド}` によるフォールバック取得。
+    let f3 = beamer_parser::FrameNode::new(&frames[3]).expect("FrameNode である。");
+    assert_eq!(f3.title_text().as_deref(), Some("本文内タイトルコマンド"));
+}
+
+#[test]
+fn test_parse_legacy_frame_macro() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\frame{
+  旧式マクロのフレーム本文
+}
+
+\frame[plain]{
+  オプション付き旧式フレーム
+}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 2);
+
+    let f0 = beamer_parser::FrameNode::new(&frames[0]).expect("FrameNode である。");
+    assert!(
+        f0.syntax()
+            .text()
+            .to_string()
+            .contains("旧式マクロのフレーム本文")
+    );
+
+    let f1 = beamer_parser::FrameNode::new(&frames[1]).expect("FrameNode である。");
+    assert_eq!(f1.options_text().as_deref(), Some("plain"));
+}
+
+#[test]
+fn test_parse_nested_options_and_title_with_macros() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}[fragile, environment={customframe}]{\textbf{太字}タイトル $x^2$}
+  本文
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 1);
+
+    let f0 = beamer_parser::FrameNode::new(&frames[0]).expect("FrameNode である。");
+    assert_eq!(
+        f0.options_text().as_deref(),
+        Some("fragile, environment={customframe}")
+    );
+    assert_eq!(
+        f0.title_text().as_deref(),
+        Some(r#"\textbf{太字}タイトル $x^2$"#)
+    );
+}
+
+#[test]
+fn test_parse_frame_trailing_trivia_retention() {
+    let source = "\\documentclass{beamer}\n\\begin{document}\n\\begin{frame}\n  本文\n\\end{frame}\n\\end{document}\n";
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 1);
+
+    // `Frame` ノードのテキストが直後の単一改行を含むことを検証する。
+    let frame_text = frames[0].text().to_string();
+    assert!(frame_text.ends_with("\n"));
+    assert_eq!(frame_text, "\\begin{frame}\n  本文\n\\end{frame}\n");
+}
+
+#[test]
+fn test_parse_unclosed_frame_error_recovery() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}
+  閉じタグのないスライド
+\begin{frame}
+  正常なスライド
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // パニックせず、入力全体をロスレスに保持する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 2);
+    assert!(!result.errors.is_empty());
+}

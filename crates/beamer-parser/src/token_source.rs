@@ -173,4 +173,37 @@ impl<'a> TokenSource<'a> {
     pub fn env_tag_end_index(&self) -> Option<usize> {
         self.nth_non_trivia_index(3)
     }
+
+    /// 直後の非 `Trivia` トークンが、指定コマンドであるかを判定する。
+    pub fn is_at_command(&self, cmd_name: &str) -> bool {
+        match self.nth_non_trivia(0) {
+            Some(token) => token.kind == SyntaxKind::Command && token.text == cmd_name,
+            None => false,
+        }
+    }
+
+    /// 現在のカーソル位置から、指定コマンドの境界が始まるかを判定する。
+    ///
+    /// 直前行の改行やコメントが残っている間は `false` を返し、コマンドまたは行頭インデントに到達した時点で `true` を返す。
+    pub fn is_at_command_boundary(&self, cmd_name: &str) -> bool {
+        if !self.is_at_command(cmd_name) {
+            return false;
+        }
+        !matches!(
+            self.current_kind(),
+            Some(SyntaxKind::Newline | SyntaxKind::Comment)
+        )
+    }
+
+    /// 現在位置のトークンが特定の `SyntaxKind` であるかを判定する。
+    #[inline]
+    pub fn at(&self, kind: SyntaxKind) -> bool {
+        self.current_kind() == Some(kind)
+    }
+
+    /// 現在位置の非 `Trivia` トークンが特定の `SyntaxKind` であるかを判定する。
+    #[inline]
+    pub fn at_non_trivia(&self, kind: SyntaxKind) -> bool {
+        self.nth_non_trivia(0).map(|t| t.kind) == Some(kind)
+    }
 }

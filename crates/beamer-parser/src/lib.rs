@@ -3,6 +3,7 @@
 //! コメントやインデント、未知のマクロを欠落させないロスレスなアイランドパースを支援する。
 
 pub mod cursor;
+pub mod grammar;
 pub mod lexer;
 pub mod parser;
 pub mod syntax;
@@ -10,6 +11,6 @@ pub mod token_source;
 
 pub use cursor::Cursor;
 pub use lexer::{Lexer, Token, tokenize};
-pub use parser::{BeamerParser, ParseResult};
+pub use parser::{BeamerParser, FrameNode, ParseResult, SectionNode};
 pub use syntax::{LatexLanguage, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use token_source::TokenSource;

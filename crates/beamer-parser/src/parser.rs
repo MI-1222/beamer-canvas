@@ -1,5 +1,8 @@
 //! 構文解析器および `GreenNode` 構築モジュール。
 
+use crate::grammar::ParserContext;
+use crate::grammar::frame::{parse_frame_env, parse_legacy_frame};
+use crate::grammar::section::parse_section;
 use crate::lexer::tokenize;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use crate::token_source::TokenSource;
@@ -34,6 +37,28 @@ impl ParseResult {
             .children()
             .find(|node| node.kind() == SyntaxKind::DocumentBody)
     }
+
+    /// 本文に含まれるすべてのスライドフレームノード `SyntaxKind::Frame` を取得する。
+    pub fn frames(&self) -> Vec<SyntaxNode> {
+        let body = match self.document_body() {
+            Some(body) => body,
+            None => return Vec::new(),
+        };
+        body.children()
+            .filter(|node| node.kind() == SyntaxKind::Frame)
+            .collect()
+    }
+
+    /// 本文に含まれるすべてのセクションおよびサブセクションノードを取得する。
+    pub fn sections(&self) -> Vec<SyntaxNode> {
+        let body = match self.document_body() {
+            Some(body) => body,
+            None => return Vec::new(),
+        };
+        body.children()
+            .filter(|node| matches!(node.kind(), SyntaxKind::Section | SyntaxKind::Subsection))
+            .collect()
+    }
 }
 
 /// ソースコードから具象構文木 `CST` を構築するパーサー構造体。
@@ -51,6 +76,7 @@ impl BeamerParser {
         let tokens = tokenize(text);
         let mut source = TokenSource::new(tokens);
         let mut builder = GreenNodeBuilder::new();
+        let mut errors = Vec::new();
 
         builder.start_node(SyntaxKind::Root.into());
 
@@ -79,10 +105,27 @@ impl BeamerParser {
                         builder.token(token.kind.into(), token.text);
                     }
 
-                    // `\end{document}` または `EOF` に達するまで本文トークンを消費する。
-                    while !source.is_eof() && !source.is_at_env_end_boundary("document") {
-                        let token = source.bump().expect("EOF ではない。");
-                        builder.token(token.kind.into(), token.text);
+                    // 本文内の `Frame` や `Section` などの各構造要素を解析する。
+                    let mut ctx = ParserContext::new(&mut source, &mut builder, &mut errors);
+                    while !ctx.source.is_eof() && !ctx.source.is_at_env_end_boundary("document") {
+                        let prev_cursor = ctx.source.cursor();
+
+                        if ctx.source.is_at_env_begin_boundary("frame") {
+                            parse_frame_env(&mut ctx);
+                        } else if ctx.source.is_at_command_boundary("\\frame") {
+                            parse_legacy_frame(&mut ctx);
+                        } else if ctx.source.is_at_command_boundary("\\section") {
+                            parse_section(&mut ctx, false);
+                        } else if ctx.source.is_at_command_boundary("\\subsection") {
+                            parse_section(&mut ctx, true);
+                        } else {
+                            ctx.bump();
+                        }
+
+                        // 各反復でトークンが進んでいることを保証し、無限ループを防ぐ。
+                        if ctx.source.cursor() == prev_cursor && !ctx.source.is_eof() {
+                            ctx.bump();
+                        }
                     }
 
                     // `\end{document}` タグが存在する場合に消費する。
@@ -120,10 +163,7 @@ impl BeamerParser {
         let green_node = builder.finish();
         let syntax = SyntaxNode::new_root(green_node);
 
-        ParseResult {
-            syntax,
-            errors: Vec::new(),
-        }
+        ParseResult { syntax, errors }
     }
 }
 
@@ -137,4 +177,211 @@ fn has_env_begin_in_stream(source: &TokenSource<'_>, env_name: &str) -> bool {
         check_source.bump();
     }
     false
+}
+
+/// スライドフレームノード `SyntaxKind::Frame` の要素参照を提供するヘルパー型。
+#[derive(Debug, Clone, Copy)]
+pub struct FrameNode<'a> {
+    syntax: &'a SyntaxNode,
+}
+
+impl<'a> FrameNode<'a> {
+    /// `SyntaxKind::Frame` ノードから `FrameNode` ラッパーを生成する。
+    pub fn new(syntax: &'a SyntaxNode) -> Option<Self> {
+        if syntax.kind() == SyntaxKind::Frame {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+
+    /// 基底の `SyntaxNode` への参照を取得する。
+    #[inline]
+    pub fn syntax(&self) -> &'a SyntaxNode {
+        self.syntax
+    }
+
+    /// フレームヘッダーノード `SyntaxKind::FrameHeader` を取得する。
+    pub fn header(&self) -> Option<SyntaxNode> {
+        self.syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::FrameHeader)
+    }
+
+    /// 角括弧オプションノード `SyntaxKind::FrameOptions` を取得する。
+    pub fn options(&self) -> Option<SyntaxNode> {
+        self.header()?
+            .children()
+            .find(|n| n.kind() == SyntaxKind::FrameOptions)
+    }
+
+    /// フレームタイトル引数ノード `SyntaxKind::FrameTitle` を取得する。
+    pub fn title_node(&self) -> Option<SyntaxNode> {
+        self.header()?
+            .children()
+            .find(|n| n.kind() == SyntaxKind::FrameTitle)
+    }
+
+    /// フレームサブタイトル引数ノード `SyntaxKind::FrameSubtitle` を取得する。
+    pub fn subtitle_node(&self) -> Option<SyntaxNode> {
+        self.header()?
+            .children()
+            .find(|n| n.kind() == SyntaxKind::FrameSubtitle)
+    }
+
+    /// オーバーレイスペックノード `SyntaxKind::OverlaySpec` を取得する。
+    pub fn overlay_spec(&self) -> Option<SyntaxNode> {
+        self.header()?
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OverlaySpec)
+    }
+
+    /// 角括弧を除いたオプション引数の内部テキストを取得する。
+    pub fn options_text(&self) -> Option<String> {
+        let options = self.options()?;
+        let text = options.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 波括弧を除いたタイトル引数の内部テキストを取得する。
+    ///
+    /// ヘッダー引数に存在しない場合は、フレーム本文内の `\frametitle{...}` からの取得を試みる。
+    pub fn title_text(&self) -> Option<String> {
+        if let Some(title_node) = self.title_node() {
+            let text = title_node.text().to_string();
+            let trimmed = text.trim();
+            if trimmed.starts_with('{') && trimmed.ends_with('}') && trimmed.len() >= 2 {
+                return Some(trimmed[1..trimmed.len() - 1].to_string());
+            }
+            return Some(trimmed.to_string());
+        }
+
+        // ヘッダー引数にタイトルがない場合は、フレーム直下の `\frametitle{...}` を探索する。
+        find_frametitle_in_node(self.syntax)
+    }
+
+    /// 波括弧を除いたサブタイトル引数の内部テキストを取得する。
+    pub fn subtitle_text(&self) -> Option<String> {
+        let subtitle_node = self.subtitle_node()?;
+        let text = subtitle_node.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('{') && trimmed.ends_with('}') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 山括弧を除いたオーバーレイスペックの内部テキストを取得する。
+    pub fn overlay_spec_text(&self) -> Option<String> {
+        let spec_node = self.overlay_spec()?;
+        let text = spec_node.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('<') && trimmed.ends_with('>') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+}
+
+/// セクション境界ノード `SyntaxKind::Section` または `SyntaxKind::Subsection` の参照を提供するヘルパー型。
+#[derive(Debug, Clone, Copy)]
+pub struct SectionNode<'a> {
+    syntax: &'a SyntaxNode,
+}
+
+impl<'a> SectionNode<'a> {
+    /// `SyntaxKind::Section` または `SyntaxKind::Subsection` ノードからラッパーを生成する。
+    pub fn new(syntax: &'a SyntaxNode) -> Option<Self> {
+        if matches!(syntax.kind(), SyntaxKind::Section | SyntaxKind::Subsection) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+
+    /// 基底の `SyntaxNode` への参照を取得する。
+    #[inline]
+    pub fn syntax(&self) -> &'a SyntaxNode {
+        self.syntax
+    }
+
+    /// サブセクションであるかを判定する。
+    #[inline]
+    pub fn is_subsection(&self) -> bool {
+        self.syntax.kind() == SyntaxKind::Subsection
+    }
+
+    /// 波括弧を除いたタイトル引数の内部テキストを取得する。
+    pub fn title_text(&self) -> Option<String> {
+        let arg = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::Argument)?;
+        let text = arg.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('{') && trimmed.ends_with('}') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 角括弧を除いたオプション引数の内部テキストを取得する。
+    pub fn options_text(&self) -> Option<String> {
+        let opt = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OptionsList)?;
+        let text = opt.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+}
+
+/// ノード配下から `\frametitle{...}` の引数テキストを探索して抽出する。
+fn find_frametitle_in_node(node: &SyntaxNode) -> Option<String> {
+    let mut tokens = node
+        .descendants_with_tokens()
+        .filter_map(|el| el.into_token());
+    while let Some(tok) = tokens.next() {
+        if tok.kind() == SyntaxKind::Command && tok.text() == "\\frametitle" {
+            // `\frametitle` の後に続く開き波括弧 `{` を探索する。
+            for next_tok in tokens.by_ref() {
+                if next_tok.kind() == SyntaxKind::LBrace {
+                    // 波括弧内のテキストを結合する。
+                    let mut title = String::new();
+                    let mut depth = 1;
+                    for body_tok in tokens.by_ref() {
+                        if body_tok.kind() == SyntaxKind::LBrace {
+                            depth += 1;
+                            title.push_str(body_tok.text());
+                        } else if body_tok.kind() == SyntaxKind::RBrace {
+                            depth -= 1;
+                            if depth == 0 {
+                                return Some(title.trim().to_string());
+                            }
+                            title.push_str(body_tok.text());
+                        } else {
+                            title.push_str(body_tok.text());
+                        }
+                    }
+                    return Some(title.trim().to_string());
+                } else if !next_tok.kind().is_trivia() {
+                    break;
+                }
+            }
+        }
+    }
+    None
 }
