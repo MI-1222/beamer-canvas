@@ -1,14 +1,9 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! `rowan` を用いた Beamer ドキュメントの構文解析および CST（具体構文木）操作を提供するクレート。
+//!
+//! コメントやインデント、未知のマクロを欠落させないロスレスなアイランドパースを支援する。
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod parser;
+pub mod syntax;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use parser::{BeamerParser, ParseResult};
+pub use syntax::{LatexLanguage, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
