@@ -7,4 +7,7 @@ edition = "2024"
 beamer-core = { version = "0.1.0", path = "../beamer-core" }
 pdfium-render = "0.9.4"
 thiserror = "2.0.21"
-tokio = { version = "1.53.2", features = ["process", "macros", "rt-multi-thread"] }
+tokio = { version = "1.53.2", features = ["process", "macros", "rt-multi-thread", "io-util", "sync"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
