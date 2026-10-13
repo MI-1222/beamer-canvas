@@ -168,6 +168,75 @@ impl<'a> TokenSource<'a> {
         )
     }
 
+    /// 直後の非 `Trivia` トークン列が環境開始タグ `\begin{env_name}` であれば、その環境名を取得する。
+    pub fn current_env_begin_name(&self) -> Option<&'a str> {
+        let t0 = self.nth_non_trivia(0)?;
+        let t1 = self.nth_non_trivia(1)?;
+        let t2 = self.nth_non_trivia(2)?;
+        let t3 = self.nth_non_trivia(3)?;
+
+        if t0.kind == SyntaxKind::Command
+            && t0.text == "\\begin"
+            && t1.kind == SyntaxKind::LBrace
+            && t2.kind == SyntaxKind::Text
+            && t3.kind == SyntaxKind::RBrace
+        {
+            Some(t2.text)
+        } else {
+            None
+        }
+    }
+
+    /// 現在のカーソル位置が環境開始タグの境界であれば、その環境名を取得する。
+    pub fn current_env_begin_boundary_name(&self) -> Option<&'a str> {
+        if matches!(
+            self.current_kind(),
+            Some(SyntaxKind::Newline | SyntaxKind::Comment)
+        ) {
+            return None;
+        }
+        self.current_env_begin_name()
+    }
+
+    /// 直後の非 `Trivia` トークン列が環境終了タグ `\end{env_name}` であれば、その環境名を取得する。
+    pub fn current_env_end_name(&self) -> Option<&'a str> {
+        let t0 = self.nth_non_trivia(0)?;
+        let t1 = self.nth_non_trivia(1)?;
+        let t2 = self.nth_non_trivia(2)?;
+        let t3 = self.nth_non_trivia(3)?;
+
+        if t0.kind == SyntaxKind::Command
+            && t0.text == "\\end"
+            && t1.kind == SyntaxKind::LBrace
+            && t2.kind == SyntaxKind::Text
+            && t3.kind == SyntaxKind::RBrace
+        {
+            Some(t2.text)
+        } else {
+            None
+        }
+    }
+
+    /// 現在のカーソル位置が環境終了タグの境界であれば、その環境名を取得する。
+    pub fn current_env_end_boundary_name(&self) -> Option<&'a str> {
+        if matches!(
+            self.current_kind(),
+            Some(SyntaxKind::Newline | SyntaxKind::Comment)
+        ) {
+            return None;
+        }
+        self.current_env_end_name()
+    }
+
+    /// 現在のカーソル位置が、指定された環境のいずれかの終了タグ境界であるかを判定する。
+    pub fn is_at_env_end_boundary_any(&self, env_names: &[&str]) -> bool {
+        if let Some(name) = self.current_env_end_boundary_name() {
+            env_names.contains(&name)
+        } else {
+            false
+        }
+    }
+
     /// 現在位置にある環境タグ `\begin{...}` または `\end{...}` の閉じ波括弧 `}` が位置する絶対インデックスを取得する。
     #[inline]
     pub fn env_tag_end_index(&self) -> Option<usize> {

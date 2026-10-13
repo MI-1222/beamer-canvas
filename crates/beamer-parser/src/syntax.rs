@@ -108,6 +108,10 @@ pub enum SyntaxKind {
     Argument,
     /// 一般的な環境ノード(`\begin{env}...\end{env}`)。
     Environment,
+    /// 画像挿入コマンド `\includegraphics[...]{...}` のノード。
+    IncludeGraphics,
+    /// 一時停止コマンド `\pause` のノード。
+    Pause,
 
     // ------------------------------------------------------------------------
     // 不透明ブロック・エラーノード(複合ノード)
@@ -128,16 +132,16 @@ pub enum SyntaxKind {
 }
 
 impl SyntaxKind {
-    /// 空白、改行、コメントなどの付随情報(Trivia)であるかを判定する。
+    /// 空白、改行、コメントなどの付随情報(`Trivia`)であるかを判定する。
     #[inline]
     pub const fn is_trivia(self) -> bool {
-        matches!(self, Self::Whitespace | Self::Newline | Self::Comment)
+        (self as u16) <= (Self::Comment as u16)
     }
 
     /// 水平空白または改行であるかを判定する。
     #[inline]
     pub const fn is_whitespace(self) -> bool {
-        matches!(self, Self::Whitespace | Self::Newline)
+        (self as u16) <= (Self::Newline as u16)
     }
 
     /// 構文木の葉(終端記号トークン)であるかを判定する。
@@ -155,14 +159,7 @@ impl SyntaxKind {
     /// 不透明ブロックまたはエラーノードであるかを判定する。
     #[inline]
     pub const fn is_opaque_or_error(self) -> bool {
-        matches!(
-            self,
-            Self::OpaqueBlock
-                | Self::OpaqueMacro
-                | Self::OpaqueEnv
-                | Self::TikzPicture
-                | Self::ErrorNode
-        )
+        (self as u16) >= (Self::OpaqueBlock as u16) && (self as u16) <= (Self::ErrorNode as u16)
     }
 
     /// 生の `rowan::SyntaxKind` から `SyntaxKind` を復元する。

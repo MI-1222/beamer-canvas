@@ -11,6 +11,9 @@ pub mod token_source;
 
 pub use cursor::Cursor;
 pub use lexer::{Lexer, Token, tokenize};
-pub use parser::{BeamerParser, FrameNode, ParseResult, SectionNode};
+pub use parser::{
+    BeamerParser, BlockNode, ColumnNode, ColumnsNode, FrameNode, IncludeGraphicsNode, ItemNode,
+    ListNode, ParseResult, PauseNode, SectionNode,
+};
 pub use syntax::{LatexLanguage, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use token_source::TokenSource;

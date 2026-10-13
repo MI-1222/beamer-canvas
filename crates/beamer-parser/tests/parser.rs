@@ -1,6 +1,6 @@
 //! `BeamerParser` の統合テスト。
 
-use beamer_parser::{BeamerParser, SyntaxKind};
+use beamer_parser::{BeamerParser, FrameNode, SyntaxKind};
 
 #[test]
 fn test_parse_roundtrip_basic() {
@@ -422,4 +422,268 @@ fn test_parse_unclosed_frame_error_recovery() {
     let frames = result.frames();
     assert_eq!(frames.len(), 2);
     assert!(!result.errors.is_empty());
+}
+
+#[test]
+fn test_parse_block_environments() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}{ブロックのテスト}
+  \begin{block}{通常のブロック}
+    通常ブロックの本文。
+  \end{block}
+
+  \begin{exampleblock}<2->{例題ブロック}
+    例題ブロックの本文。
+  \end{exampleblock}
+
+  \begin{alertblock}[オプション]{警告ブロック}
+    警告ブロックの本文。
+  \end{alertblock}
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // ラウンドトリップ完全一致を検証する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 1);
+
+    let frame = FrameNode::new(&frames[0]).expect("FrameNode である。");
+    let blocks = frame.blocks();
+    assert_eq!(blocks.len(), 3);
+
+    // 1. 通常のブロック。
+    assert_eq!(blocks[0].title_text().as_deref(), Some("通常のブロック"));
+    assert_eq!(blocks[0].overlay_spec_text(), None);
+    assert_eq!(blocks[0].options_text(), None);
+
+    // 2. 例題ブロック。オーバーレイ付き。
+    assert_eq!(blocks[1].title_text().as_deref(), Some("例題ブロック"));
+    assert_eq!(blocks[1].overlay_spec_text().as_deref(), Some("2-"));
+    assert_eq!(blocks[1].options_text(), None);
+
+    // 3. 警告ブロック。オプション付き。
+    assert_eq!(blocks[2].title_text().as_deref(), Some("警告ブロック"));
+    assert_eq!(blocks[2].options_text().as_deref(), Some("オプション"));
+}
+
+#[test]
+fn test_parse_columns_and_column_environments() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}{段組みのテスト}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      左列のテキスト
+    \end{column}
+    \begin{column}[t]{0.48\textwidth}
+      右列のテキスト
+    \end{column}
+  \end{columns}
+
+  \begin{columns}
+    \column{0.5\textwidth}
+    マクロ形式の左列
+    \column{0.5\textwidth}
+    マクロ形式の右列
+  \end{columns}
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // ラウンドトリップ完全一致を検証する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 1);
+
+    let frame = FrameNode::new(&frames[0]).expect("FrameNode である。");
+    let columns_layouts = frame.columns_layouts();
+    assert_eq!(columns_layouts.len(), 2);
+
+    // 1. 環境形式の段組み。
+    assert_eq!(columns_layouts[0].options_text().as_deref(), Some("c"));
+    let cols1 = columns_layouts[0].columns();
+    assert_eq!(cols1.len(), 2);
+    assert_eq!(cols1[0].width_text().as_deref(), Some("0.48\\textwidth"));
+    assert_eq!(cols1[0].placement_text(), None);
+    assert_eq!(cols1[1].width_text().as_deref(), Some("0.48\\textwidth"));
+    assert_eq!(cols1[1].placement_text().as_deref(), Some("t"));
+
+    // 2. マクロ形式の段組み。
+    let cols2 = columns_layouts[1].columns();
+    assert_eq!(cols2.len(), 2);
+    assert_eq!(cols2[0].width_text().as_deref(), Some("0.5\\textwidth"));
+    assert_eq!(cols2[1].width_text().as_deref(), Some("0.5\\textwidth"));
+}
+
+#[test]
+fn test_parse_itemize_and_enumerate_environments() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}{箇条書きのテスト}
+  \begin{itemize}
+    \item 項目1
+    \item<2->[$\star$] 項目2
+    \begin{itemize}
+      \item ネストした項目
+    \end{itemize}
+    \item 項目3
+  \end{itemize}
+
+  \begin{enumerate}
+    \item 番号付き1
+    \item 番号付き2
+  \end{enumerate}
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // ラウンドトリップ完全一致を検証する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 1);
+
+    let frame = FrameNode::new(&frames[0]).expect("FrameNode である。");
+    let lists = frame.lists();
+    // 外側の `itemize`、ネストした `itemize`、外側の `enumerate` の合計3件。
+    assert_eq!(lists.len(), 3);
+
+    // 外側の `itemize`。
+    assert!(!lists[0].is_enumerate());
+    let items = lists[0].items();
+    assert_eq!(items.len(), 3);
+    assert_eq!(items[0].overlay_spec_text(), None);
+    assert_eq!(items[0].options_text(), None);
+    assert_eq!(items[1].overlay_spec_text().as_deref(), Some("2-"));
+    assert_eq!(items[1].options_text().as_deref(), Some("$\\star$"));
+
+    // ネストした `itemize`。
+    let nested_items = lists[1].items();
+    assert_eq!(nested_items.len(), 1);
+
+    // 番号付きリスト `enumerate`。
+    assert!(lists[2].is_enumerate());
+    let enum_items = lists[2].items();
+    assert_eq!(enum_items.len(), 2);
+}
+
+#[test]
+fn test_parse_includegraphics_and_pause() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}{画像と一時停止}
+  画像表示の前
+  \pause
+  \includegraphics[width=0.8\textwidth]{figures/plot.pdf}
+  \pause<3->
+  \includegraphics<4->[height=5cm]{image.png}
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // ラウンドトリップ完全一致を検証する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 1);
+
+    let frame = FrameNode::new(&frames[0]).expect("FrameNode である。");
+
+    // 一時停止コマンド `\pause` を検証する。
+    let pauses = frame.pause_commands();
+    assert_eq!(pauses.len(), 2);
+    assert_eq!(pauses[0].overlay_spec_text(), None);
+    assert_eq!(pauses[1].overlay_spec_text().as_deref(), Some("3-"));
+
+    // 画像挿入コマンド `\includegraphics` を検証する。
+    let images = frame.images();
+    assert_eq!(images.len(), 2);
+    assert_eq!(images[0].path_text().as_deref(), Some("figures/plot.pdf"));
+    assert_eq!(
+        images[0].options_text().as_deref(),
+        Some("width=0.8\\textwidth")
+    );
+    assert_eq!(images[0].overlay_spec_text(), None);
+
+    assert_eq!(images[1].path_text().as_deref(), Some("image.png"));
+    assert_eq!(images[1].options_text().as_deref(), Some("height=5cm"));
+    assert_eq!(images[1].overlay_spec_text().as_deref(), Some("4-"));
+}
+
+#[test]
+fn test_parse_complex_frame_with_all_elements() {
+    let source = r#"\documentclass{beamer}
+\usetheme{Madrid}
+
+\begin{document}
+\begin{frame}<1->[t]{複合スライド}{サブタイトル}
+  \frametitle{上書きされないタイトル}
+  \begin{columns}[onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{概要}
+        \begin{itemize}
+          \item ポイント 1
+          \item<2-> ポイント 2
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\linewidth]{diagram.png}
+      \pause
+      数式 $E = mc^2$ とテキスト。
+    \end{column}
+  \end{columns}
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // ラウンドトリップ完全一致を検証する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 1);
+
+    let frame = FrameNode::new(&frames[0]).expect("FrameNode である。");
+    assert_eq!(frame.title_text().as_deref(), Some("複合スライド"));
+    assert_eq!(frame.subtitle_text().as_deref(), Some("サブタイトル"));
+    assert_eq!(frame.overlay_spec_text().as_deref(), Some("1-"));
+    assert_eq!(frame.options_text().as_deref(), Some("t"));
+
+    let columns = frame.columns_layouts();
+    assert_eq!(columns.len(), 1);
+    assert_eq!(columns[0].columns().len(), 2);
+
+    let blocks = frame.blocks();
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].title_text().as_deref(), Some("概要"));
+
+    let lists = frame.lists();
+    assert_eq!(lists.len(), 1);
+    assert_eq!(lists[0].items().len(), 2);
+
+    let images = frame.images();
+    assert_eq!(images.len(), 1);
+    assert_eq!(images[0].path_text().as_deref(), Some("diagram.png"));
+
+    let pauses = frame.pause_commands();
+    assert_eq!(pauses.len(), 1);
 }

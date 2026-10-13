@@ -24,18 +24,8 @@ pub fn parse_frame_env(ctx: &mut ParserContext<'_, '_>) {
     // オーバーレイ、オプション、タイトル、サブタイトルを含むフレームヘッダーをパースする。
     parse_frame_header(ctx);
 
-    // `\end{frame}` またはドキュメント終了までフレーム本文を消費する。
-    while !ctx.source.is_eof() && !ctx.source.is_at_env_end_boundary("frame") {
-        // 次のフレーム開始またはドキュメント終了に達した場合は、閉じタグ欠落として同期回復する。
-        if ctx.source.is_at_env_begin_boundary("frame")
-            || ctx.source.is_at_env_end_boundary("document")
-        {
-            ctx.errors
-                .push("`frame` 環境の閉じタグが見つからないまま次のブロックへ到達した。".to_string());
-            break;
-        }
-        ctx.bump();
-    }
+    // ブロック、段組み、箇条書き、画像などを含む `frame` 本文をパースする。
+    super::elements::parse_frame_content(ctx);
 
     // `\end{frame}` タグを消費する。
     if ctx.source.is_at_env_end_boundary("frame") {

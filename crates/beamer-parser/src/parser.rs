@@ -180,16 +180,18 @@ fn has_env_begin_in_stream(source: &TokenSource<'_>, env_name: &str) -> bool {
 }
 
 /// スライドフレームノード `SyntaxKind::Frame` の要素参照を提供するヘルパー型。
-#[derive(Debug, Clone, Copy)]
-pub struct FrameNode<'a> {
-    syntax: &'a SyntaxNode,
+#[derive(Debug, Clone)]
+pub struct FrameNode {
+    syntax: SyntaxNode,
 }
 
-impl<'a> FrameNode<'a> {
+impl FrameNode {
     /// `SyntaxKind::Frame` ノードから `FrameNode` ラッパーを生成する。
-    pub fn new(syntax: &'a SyntaxNode) -> Option<Self> {
+    pub fn new(syntax: &SyntaxNode) -> Option<Self> {
         if syntax.kind() == SyntaxKind::Frame {
-            Some(Self { syntax })
+            Some(Self {
+                syntax: syntax.clone(),
+            })
         } else {
             None
         }
@@ -197,8 +199,8 @@ impl<'a> FrameNode<'a> {
 
     /// 基底の `SyntaxNode` への参照を取得する。
     #[inline]
-    pub fn syntax(&self) -> &'a SyntaxNode {
-        self.syntax
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
     }
 
     /// フレームヘッダーノード `SyntaxKind::FrameHeader` を取得する。
@@ -262,7 +264,7 @@ impl<'a> FrameNode<'a> {
         }
 
         // ヘッダー引数にタイトルがない場合は、フレーム直下の `\frametitle{...}` を探索する。
-        find_frametitle_in_node(self.syntax)
+        find_frametitle_in_node(&self.syntax)
     }
 
     /// 波括弧を除いたサブタイトル引数の内部テキストを取得する。
@@ -288,19 +290,61 @@ impl<'a> FrameNode<'a> {
             Some(trimmed.to_string())
         }
     }
+
+    /// フレーム配下のブロックノード `SyntaxKind::Block` をすべて取得する。
+    pub fn blocks(&self) -> Vec<BlockNode> {
+        self.syntax
+            .descendants()
+            .filter_map(|n| BlockNode::new(&n))
+            .collect()
+    }
+
+    /// フレーム配下の段組みノード `SyntaxKind::Columns` をすべて取得する。
+    pub fn columns_layouts(&self) -> Vec<ColumnsNode> {
+        self.syntax
+            .descendants()
+            .filter_map(|n| ColumnsNode::new(&n))
+            .collect()
+    }
+
+    /// フレーム配下の箇条書き環境ノードをすべて取得する。
+    pub fn lists(&self) -> Vec<ListNode> {
+        self.syntax
+            .descendants()
+            .filter_map(|n| ListNode::new(&n))
+            .collect()
+    }
+
+    /// フレーム配下の画像挿入ノード `SyntaxKind::IncludeGraphics` をすべて取得する。
+    pub fn images(&self) -> Vec<IncludeGraphicsNode> {
+        self.syntax
+            .descendants()
+            .filter_map(|n| IncludeGraphicsNode::new(&n))
+            .collect()
+    }
+
+    /// フレーム配下の `\pause` コマンドノード `SyntaxKind::Pause` をすべて取得する。
+    pub fn pause_commands(&self) -> Vec<PauseNode> {
+        self.syntax
+            .descendants()
+            .filter_map(|n| PauseNode::new(&n))
+            .collect()
+    }
 }
 
-/// セクション境界ノード `SyntaxKind::Section` または `SyntaxKind::Subsection` の参照を提供するヘルパー型。
-#[derive(Debug, Clone, Copy)]
-pub struct SectionNode<'a> {
-    syntax: &'a SyntaxNode,
+/// ブロック環境ノード `SyntaxKind::Block` をラップする型。
+#[derive(Debug, Clone)]
+pub struct BlockNode {
+    syntax: SyntaxNode,
 }
 
-impl<'a> SectionNode<'a> {
-    /// `SyntaxKind::Section` または `SyntaxKind::Subsection` ノードからラッパーを生成する。
-    pub fn new(syntax: &'a SyntaxNode) -> Option<Self> {
-        if matches!(syntax.kind(), SyntaxKind::Section | SyntaxKind::Subsection) {
-            Some(Self { syntax })
+impl BlockNode {
+    /// `SyntaxKind::Block` ノードからラッパーを生成する。
+    pub fn new(syntax: &SyntaxNode) -> Option<Self> {
+        if syntax.kind() == SyntaxKind::Block {
+            Some(Self {
+                syntax: syntax.clone(),
+            })
         } else {
             None
         }
@@ -308,8 +352,385 @@ impl<'a> SectionNode<'a> {
 
     /// 基底の `SyntaxNode` への参照を取得する。
     #[inline]
-    pub fn syntax(&self) -> &'a SyntaxNode {
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+
+    /// 波括弧を除いたタイトル引数の内部テキストを取得する。
+    pub fn title_text(&self) -> Option<String> {
+        let arg = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::Argument)?;
+        let text = arg.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('{') && trimmed.ends_with('}') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 山括弧を除いたオーバーレイスペックの内部テキストを取得する。
+    pub fn overlay_spec_text(&self) -> Option<String> {
+        let spec = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OverlaySpec)?;
+        let text = spec.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('<') && trimmed.ends_with('>') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 角括弧を除いたオプション引数の内部テキストを取得する。
+    pub fn options_text(&self) -> Option<String> {
+        let opt = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OptionsList)?;
+        let text = opt.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+}
+
+/// 段組み環境ノード `SyntaxKind::Columns` をラップする型。
+#[derive(Debug, Clone)]
+pub struct ColumnsNode {
+    syntax: SyntaxNode,
+}
+
+impl ColumnsNode {
+    /// `SyntaxKind::Columns` ノードからラッパーを生成する。
+    pub fn new(syntax: &SyntaxNode) -> Option<Self> {
+        if syntax.kind() == SyntaxKind::Columns {
+            Some(Self {
+                syntax: syntax.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// 基底の `SyntaxNode` への参照を取得する。
+    #[inline]
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+
+    /// 角括弧を除いたオプション引数の内部テキストを取得する。
+    pub fn options_text(&self) -> Option<String> {
+        let opt = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OptionsList)?;
+        let text = opt.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 段組み内部に含まれる列ノード `ColumnNode` の一覧を取得する。
+    pub fn columns(&self) -> Vec<ColumnNode> {
         self.syntax
+            .children()
+            .filter_map(|n| ColumnNode::new(&n))
+            .collect()
+    }
+}
+
+/// 単一列ノード `SyntaxKind::Column` をラップする型。
+#[derive(Debug, Clone)]
+pub struct ColumnNode {
+    syntax: SyntaxNode,
+}
+
+impl ColumnNode {
+    /// `SyntaxKind::Column` ノードからラッパーを生成する。
+    pub fn new(syntax: &SyntaxNode) -> Option<Self> {
+        if syntax.kind() == SyntaxKind::Column {
+            Some(Self {
+                syntax: syntax.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// 基底の `SyntaxNode` への参照を取得する。
+    #[inline]
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+
+    /// 波括弧を除いた列幅指定の内部テキストを取得する。
+    pub fn width_text(&self) -> Option<String> {
+        let arg = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::Argument)?;
+        let text = arg.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('{') && trimmed.ends_with('}') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 角括弧を除いた配置オプションの内部テキストを取得する。
+    pub fn placement_text(&self) -> Option<String> {
+        let opt = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OptionsList)?;
+        let text = opt.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+}
+
+/// 箇条書き環境ノード `SyntaxKind::Itemize` または `SyntaxKind::Enumerate` をラップする型。
+#[derive(Debug, Clone)]
+pub struct ListNode {
+    syntax: SyntaxNode,
+}
+
+impl ListNode {
+    /// リスト環境ノードからラッパーを生成する。
+    pub fn new(syntax: &SyntaxNode) -> Option<Self> {
+        if matches!(syntax.kind(), SyntaxKind::Itemize | SyntaxKind::Enumerate) {
+            Some(Self {
+                syntax: syntax.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// 基底の `SyntaxNode` への参照を取得する。
+    #[inline]
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+
+    /// 番号付きリスト `enumerate` であるかを判定する。
+    #[inline]
+    pub fn is_enumerate(&self) -> bool {
+        self.syntax.kind() == SyntaxKind::Enumerate
+    }
+
+    /// リスト内に含まれるすべての項目ノード `ItemNode` を取得する。
+    pub fn items(&self) -> Vec<ItemNode> {
+        self.syntax
+            .children()
+            .filter_map(|n| ItemNode::new(&n))
+            .collect()
+    }
+}
+
+/// 箇条書き項目ノード `SyntaxKind::Item` をラップする型。
+#[derive(Debug, Clone)]
+pub struct ItemNode {
+    syntax: SyntaxNode,
+}
+
+impl ItemNode {
+    /// `SyntaxKind::Item` ノードからラッパーを生成する。
+    pub fn new(syntax: &SyntaxNode) -> Option<Self> {
+        if syntax.kind() == SyntaxKind::Item {
+            Some(Self {
+                syntax: syntax.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// 基底の `SyntaxNode` への参照を取得する。
+    #[inline]
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+
+    /// 山括弧を除いたオーバーレイスペックの内部テキストを取得する。
+    pub fn overlay_spec_text(&self) -> Option<String> {
+        let spec = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OverlaySpec)?;
+        let text = spec.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('<') && trimmed.ends_with('>') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 角括弧を除いたラベル・オプション引数の内部テキストを取得する。
+    pub fn options_text(&self) -> Option<String> {
+        let opt = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OptionsList)?;
+        let text = opt.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+}
+
+/// 画像挿入ノード `SyntaxKind::IncludeGraphics` をラップする型。
+#[derive(Debug, Clone)]
+pub struct IncludeGraphicsNode {
+    syntax: SyntaxNode,
+}
+
+impl IncludeGraphicsNode {
+    /// `SyntaxKind::IncludeGraphics` ノードからラッパーを生成する。
+    pub fn new(syntax: &SyntaxNode) -> Option<Self> {
+        if syntax.kind() == SyntaxKind::IncludeGraphics {
+            Some(Self {
+                syntax: syntax.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// 基底の `SyntaxNode` への参照を取得する。
+    #[inline]
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+
+    /// 波括弧を除いた画像ファイルパスの内部テキストを取得する。
+    pub fn path_text(&self) -> Option<String> {
+        let arg = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::Argument)?;
+        let text = arg.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('{') && trimmed.ends_with('}') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 角括弧を除いたオプション引数の内部テキストを取得する。
+    pub fn options_text(&self) -> Option<String> {
+        let opt = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OptionsList)?;
+        let text = opt.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    /// 山括弧を除いたオーバーレイスペックの内部テキストを取得する。
+    pub fn overlay_spec_text(&self) -> Option<String> {
+        let spec = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OverlaySpec)?;
+        let text = spec.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('<') && trimmed.ends_with('>') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+}
+
+/// 一時停止コマンドノード `SyntaxKind::Pause` をラップする型。
+#[derive(Debug, Clone)]
+pub struct PauseNode {
+    syntax: SyntaxNode,
+}
+
+impl PauseNode {
+    /// `SyntaxKind::Pause` ノードからラッパーを生成する。
+    pub fn new(syntax: &SyntaxNode) -> Option<Self> {
+        if syntax.kind() == SyntaxKind::Pause {
+            Some(Self {
+                syntax: syntax.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// 基底の `SyntaxNode` への参照を取得する。
+    #[inline]
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+
+    /// 山括弧を除いたオーバーレイスペックの内部テキストを取得する。
+    pub fn overlay_spec_text(&self) -> Option<String> {
+        let spec = self
+            .syntax
+            .children()
+            .find(|n| n.kind() == SyntaxKind::OverlaySpec)?;
+        let text = spec.text().to_string();
+        let trimmed = text.trim();
+        if trimmed.starts_with('<') && trimmed.ends_with('>') && trimmed.len() >= 2 {
+            Some(trimmed[1..trimmed.len() - 1].to_string())
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+}
+
+/// セクション境界ノード `SyntaxKind::Section` または `SyntaxKind::Subsection` の参照を提供するヘルパー型。
+#[derive(Debug, Clone)]
+pub struct SectionNode {
+    syntax: SyntaxNode,
+}
+
+impl SectionNode {
+    /// `SyntaxKind::Section` または `SyntaxKind::Subsection` ノードからラッパーを生成する。
+    pub fn new(syntax: &SyntaxNode) -> Option<Self> {
+        if matches!(syntax.kind(), SyntaxKind::Section | SyntaxKind::Subsection) {
+            Some(Self {
+                syntax: syntax.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// 基底の `SyntaxNode` への参照を取得する。
+    #[inline]
+    pub fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
     }
 
     /// サブセクションであるかを判定する。
