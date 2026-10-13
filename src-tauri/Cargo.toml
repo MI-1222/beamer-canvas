@@ -8,7 +8,7 @@ beamer-core = { version = "0.1.0", path = "../crates/beamer-core" }
 beamer-git = { version = "0.1.0", path = "../crates/beamer-git" }
 beamer-parser = { version = "0.1.0", path = "../crates/beamer-parser" }
 beamer-renderer = { version = "0.1.0", path = "../crates/beamer-renderer" }
-tauri = "^2"
+tauri = { version = "^2", features = [] }
 
 [build-dependencies]
-tauri-build = "^2"
+tauri-build = { version = "^2", features = [] }
