@@ -1,0 +1,15 @@
+{
+  "semi": true,
+  "singleQuote": true,
+  "jsxSingleQuote": true,
+  "bracketSameLine": false,
+  "tabWidth": 2,
+  "useTabs": false,
+  "trailingComma": "all",
+  "printWidth": 80,
+  "bracketSpacing": true,
+  "endOfLine": "lf",
+  "plugins": ["prettier-plugin-tailwindcss"],
+  "tailwindFunctions": ["clsx", "cn", "twMerge"],
+  "tailwindStylesheet": "./src/index.css"
+}
