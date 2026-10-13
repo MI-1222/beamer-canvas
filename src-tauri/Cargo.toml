@@ -8,6 +8,7 @@ beamer-core = { version = "0.1.0", path = "../crates/beamer-core" }
 beamer-git = { version = "0.1.0", path = "../crates/beamer-git" }
 beamer-parser = { version = "0.1.0", path = "../crates/beamer-parser" }
 beamer-renderer = { version = "0.1.0", path = "../crates/beamer-renderer" }
+serde = { version = "1.0.229", features = ["derive"] }
 tauri = { version = "^2", features = [] }
 
 [build-dependencies]

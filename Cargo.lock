@@ -124,6 +124,7 @@ dependencies = [
  "beamer-git",
  "beamer-parser",
  "beamer-renderer",
+ "serde",
  "tauri",
  "tauri-build",
 ]
