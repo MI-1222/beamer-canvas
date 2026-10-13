@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Beamer Editor のコア機能を提供するクレート。
+//!
+//! プロジェクト管理、設定、キャッシュキーの生成、エラー型の定義を担当する。
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod cache;
+pub mod error;
+pub mod project;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use cache::ContentHasher;
+pub use error::{CoreError, Result};
+pub use project::{Project, ProjectConfig};
