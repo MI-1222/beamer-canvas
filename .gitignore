@@ -3,5 +3,9 @@
 # Tauri v2 自動生成スキーマ
 /src-tauri/gen/schemas/
 
+# Frontend
+/frontend/node_modules
+/frontend/dist
+
 # macOS
 .DS_Store
