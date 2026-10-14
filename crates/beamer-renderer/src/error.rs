@@ -56,6 +56,13 @@ pub enum RenderError {
         /// 詳細メッセージ。
         message: String,
     },
+
+    /// ページマッピングおよび中間ファイル解析のエラー。
+    #[error("ページマッピング処理に失敗しました: {message}")]
+    Mapping {
+        /// 詳細メッセージ。
+        message: String,
+    },
 }
 
 /// レンダラーモジュールの汎用 `Result` 型エイリアス。

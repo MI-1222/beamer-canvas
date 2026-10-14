@@ -1,6 +1,6 @@
 //! 非同期ビルドマネージャー。
 //!
-//! 連続した編集要求に対する先行プロセスの安全なキャンセル（`Supersede` 制御）、
+//! 連続した編集要求に対する先行プロセスの安全なキャンセル(`Supersede` 制御)、
 //! サンドボックスと中間ファイルの分離保護、および `TeX` ログの構造化診断を統合して実行する。
 
 use super::detector::{TexCommandKind, TexEnvironment};
@@ -20,15 +20,15 @@ use tokio_util::sync::CancellationToken;
 pub struct BuildRequest {
     /// プロジェクトのルートディレクトリ。
     pub project_root: PathBuf,
-    /// メインとなる `TeX` ファイルの相対パス（例: `main.tex`）。
+    /// メインとなる `TeX` ファイルの相対パス(例: `main.tex`)。
     pub main_file: PathBuf,
-    /// ビルド種別（フルコンパイルまたは部分コンパイル）。
+    /// ビルド種別(フルコンパイルまたは部分コンパイル)。
     pub kind: BuildKind,
-    /// 使用する `TeX` エンジン（未指定時はシステム環境から自動選択）。
+    /// 使用する `TeX` エンジン(未指定時はシステム環境から自動選択)。
     pub engine: Option<TexCommandKind>,
     /// 追加のコンパイルオプション引数。
     pub extra_args: Vec<String>,
-    /// メモリ上のソースコード文字列（未保存の入力内容や一時ラベル注入版）。
+    /// メモリ上のソースコード文字列(未保存の入力内容や一時ラベル注入版)。
     pub source_override: Option<String>,
 }
 
@@ -71,11 +71,11 @@ pub struct BuildResult {
     pub exit_code: Option<i32>,
     /// 生成されたpdfファイルの絶対パス。
     pub pdf_path: Option<PathBuf>,
-    /// 抽出された診断情報（エラーや警告）の一覧。
+    /// 抽出された診断情報(エラーや警告)の一覧。
     pub diagnostics: Vec<Diagnostic>,
     /// 検知された不足ファイル名の一覧。
     pub missing_files: Vec<String>,
-    /// 中間ファイル `.nav` の内容（オーバーレイとページ番号の同期用）。
+    /// 中間ファイル `.nav` の内容(オーバーレイとページ番号の同期用)。
     pub nav_content: Option<String>,
     /// 標準出力ログの全テキスト。
     pub stdout: String,
@@ -83,7 +83,34 @@ pub struct BuildResult {
     pub stderr: String,
 }
 
-/// 内部状態（実行中タスクのキャンセルトークン）を保持するスロット。
+impl BuildResult {
+    /// ビルド結果の `.nav` コンテンツからスライドマッピングテーブルを生成する。
+    pub fn mapping_table(&self) -> Option<crate::mapping::SlideMappingTable> {
+        self.nav_content
+            .as_deref()
+            .map(crate::mapping::SlideMappingTable::from_nav)
+    }
+
+    /// PDF のラベル情報と組み合わせて、フォールバック付きのスライドマッピングテーブルを生成する。
+    pub fn mapping_table_with_fallback(
+        &self,
+        rasterizer: &crate::pdf::PdfRasterizer,
+        expected_frames: Option<usize>,
+    ) -> Option<crate::mapping::SlideMappingTable> {
+        let pdf_path = self.pdf_path.as_deref()?;
+        let labels = rasterizer
+            .get_page_labels_from_file(pdf_path)
+            .ok()
+            .unwrap_or_default();
+        Some(crate::mapping::SlideMappingTable::from_nav_with_fallback(
+            self.nav_content.as_deref(),
+            &labels,
+            expected_frames,
+        ))
+    }
+}
+
+/// 内部状態(実行中タスクのキャンセルトークン)を保持するスロット。
 #[derive(Debug, Default)]
 struct BuildSlot {
     current_token: Option<CancellationToken>,
@@ -177,7 +204,7 @@ impl BuildManager {
         let texinputs = sandbox.build_texinputs(&workdir);
         let env_vars = [("TEXINPUTS", texinputs.as_str())];
 
-        // 4. コンパイル対象ファイルの決定（インメモリテキストの書き出し対応）。
+        // 4. コンパイル対象ファイルの決定(インメモリテキストの書き出し対応)。
         let target_file_path = if let Some(ref source) = request.source_override {
             let temp_source_path = workdir.join(main_file_name);
             fs::write(&temp_source_path, source).map_err(|e| RenderError::Sandbox {
