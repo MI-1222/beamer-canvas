@@ -11,7 +11,9 @@ pub mod syntax;
 pub mod token_source;
 
 pub use cursor::Cursor;
-pub use edit::{DocumentEditor, EditError, FrameEditor, FrameHandle, SectionHandle, TextEdit};
+pub use edit::{
+    DocumentEditor, EditError, FrameEditor, FrameHandle, PropertyEditor, SectionHandle, TextEdit,
+};
 pub use lexer::{Lexer, Token, tokenize};
 pub use parser::{
     BeamerParser, BlockNode, ColumnNode, ColumnsNode, FrameNode, IncludeGraphicsNode, ItemNode,

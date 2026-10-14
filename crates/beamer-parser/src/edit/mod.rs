@@ -3,11 +3,13 @@
 pub mod error;
 pub mod frame_edit;
 pub mod handle;
+pub mod property_edit;
 pub mod text_edit;
 
 pub use error::EditError;
 pub use frame_edit::FrameEditor;
 pub use handle::{FrameHandle, SectionHandle};
+pub use property_edit::PropertyEditor;
 pub use text_edit::TextEdit;
 
 use crate::parser::{BeamerParser, FrameNode, ParseResult, SectionNode};
@@ -188,6 +190,101 @@ impl DocumentEditor {
     ) -> Result<DocumentEditor, EditError> {
         let count = self.frame_count()?;
         self.insert_frame_with_auto_indent(count, frame_source)
+    }
+
+    /// 指定されたスライドのタイトルを更新する。
+    pub fn set_frame_title(
+        &self,
+        frame_index: usize,
+        new_title: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::set_frame_title(self, frame_index, new_title)
+    }
+
+    /// 指定されたスライドのサブタイトルを更新する。
+    pub fn set_frame_subtitle(
+        &self,
+        frame_index: usize,
+        new_subtitle: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::set_frame_subtitle(self, frame_index, new_subtitle)
+    }
+
+    /// 指定されたスライドのオプション引数 `[...]` を更新する。
+    pub fn set_frame_options(
+        &self,
+        frame_index: usize,
+        new_options: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::set_frame_options(self, frame_index, new_options)
+    }
+
+    /// 指定スライド内の画像要素 `\includegraphics` のオプション文字列全体を更新する。
+    pub fn set_image_options(
+        &self,
+        frame_index: usize,
+        image_index: usize,
+        new_options: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::set_image_options(self, frame_index, image_index, new_options)
+    }
+
+    /// 指定スライド内の画像要素 `\includegraphics` の `width` オプションのみを更新する。
+    pub fn set_image_width(
+        &self,
+        frame_index: usize,
+        image_index: usize,
+        new_width: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::set_image_width(self, frame_index, image_index, new_width)
+    }
+
+    /// 指定スライド内の画像要素 `\includegraphics` の画像ファイルパス引数を更新する。
+    pub fn set_image_path(
+        &self,
+        frame_index: usize,
+        image_index: usize,
+        new_path: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::set_image_path(self, frame_index, image_index, new_path)
+    }
+
+    /// 指定された要素ノードの直前または直後に `\vspace` を挿入する。
+    pub fn insert_vspace_around_node(
+        &self,
+        target_node: &SyntaxNode,
+        length: &str,
+        after: bool,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::insert_vspace_around_node(self, target_node, length, after)
+    }
+
+    /// 指定されたスライドの本文先頭または末尾に `\vspace` を挿入する。
+    pub fn insert_frame_vspace(
+        &self,
+        frame_index: usize,
+        length: &str,
+        at_top: bool,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::insert_frame_vspace(self, frame_index, length, at_top)
+    }
+
+    /// 任意の構文ノードのテキスト範囲を新しい文字列で置換する。
+    pub fn replace_node(
+        &self,
+        node: &SyntaxNode,
+        new_text: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::replace_node(self, node, new_text)
+    }
+
+    /// 任意のバイト範囲を新しい文字列で置換する。
+    pub fn replace_range(
+        &self,
+        range: rowan::TextRange,
+        new_text: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        PropertyEditor::replace_range(self, range, new_text)
     }
 
     /// 現在のエディタ状態から新しい構文解析結果 `ParseResult` を生成する。

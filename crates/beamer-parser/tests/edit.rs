@@ -527,3 +527,261 @@ fn test_edit_out_of_bounds_and_syntax_error_guards() {
         Err(EditError::SyntaxError { .. })
     ));
 }
+
+#[test]
+fn test_property_edit_titles() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+
+\begin{frame}{旧ヘッダータイトル}
+  本文1
+\end{frame}
+
+\begin{frame}
+  \frametitle{旧マクロタイトル}
+  本文2
+\end{frame}
+
+\begin{frame}
+  タイトルなしスライド
+\end{frame}
+
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+    let editor = result.editor();
+
+    // 1. ヘッダータイトル `{...}` の置換を検証する。
+    let ed1 = editor
+        .set_frame_title(0, "新ヘッダータイトル")
+        .expect("タイトル更新に失敗。");
+    let frames1 = ed1.get_frames().expect("スライド取得に失敗。");
+    assert_eq!(
+        frames1[0].title_text().as_deref(),
+        Some("新ヘッダータイトル")
+    );
+
+    // 2. 本文内 `\frametitle{...}` の置換を検証する。
+    let ed2 = ed1
+        .set_frame_title(1, "新マクロタイトル")
+        .expect("マクロタイトル更新に失敗。");
+    let frames2 = ed2.get_frames().expect("スライド取得に失敗。");
+    assert_eq!(frames2[1].title_text().as_deref(), Some("新マクロタイトル"));
+    assert!(ed2.text().contains("\\frametitle{新マクロタイトル}"));
+
+    // 3. タイトルなしスライドへの新規タイトル挿入を検証する。
+    let ed3 = ed2
+        .set_frame_title(2, "新規追加タイトル")
+        .expect("タイトル新規追加に失敗。");
+    let frames3 = ed3.get_frames().expect("スライド取得に失敗。");
+    assert_eq!(frames3[2].title_text().as_deref(), Some("新規追加タイトル"));
+
+    // 4. サブタイトルの追加・置換・削除を検証する。
+    let ed4 = ed3
+        .set_frame_subtitle(0, "新サブタイトル")
+        .expect("サブタイトル追加に失敗。");
+    let frames4 = ed4.get_frames().expect("スライド取得に失敗。");
+    assert_eq!(
+        frames4[0].subtitle_text().as_deref(),
+        Some("新サブタイトル")
+    );
+
+    // サブタイトルを空文字列で削除する。
+    let ed5 = ed4
+        .set_frame_subtitle(0, "")
+        .expect("サブタイトル削除に失敗。");
+    let frames5 = ed5.get_frames().expect("スライド取得に失敗。");
+    assert_eq!(frames5[0].subtitle_text(), None);
+}
+
+#[test]
+fn test_property_edit_options() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+
+\begin{frame}[plain]{タイトル1}
+  本文1
+\end{frame}
+
+\begin{frame}{タイトル2}
+  本文2
+\end{frame}
+
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+    let editor = result.editor();
+
+    // 1. 既存オプション `[plain]` を `[fragile, shrink]` に置換する。
+    let ed1 = editor
+        .set_frame_options(0, "fragile, shrink")
+        .expect("オプション更新に失敗。");
+    let frames1 = ed1.get_frames().expect("スライド取得に失敗。");
+    assert_eq!(
+        frames1[0].options_text().as_deref(),
+        Some("fragile, shrink")
+    );
+
+    // 2. オプションを空文字列で削除する。
+    let ed2 = ed1
+        .set_frame_options(0, "")
+        .expect("オプション削除に失敗。");
+    let frames2 = ed2.get_frames().expect("スライド取得に失敗。");
+    assert_eq!(frames2[0].options_text(), None);
+
+    // 3. オプションを持たないスライドに新規オプション `[t]` を挿入する。
+    let ed3 = ed2
+        .set_frame_options(1, "[t]")
+        .expect("オプション新規追加に失敗。");
+    let frames3 = ed3.get_frames().expect("スライド取得に失敗。");
+    assert_eq!(frames3[1].options_text().as_deref(), Some("t"));
+    assert!(ed3.text().contains("\\begin{frame}[t]{タイトル2}"));
+}
+
+#[test]
+fn test_property_edit_images() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+
+\begin{frame}{画像スライド}
+  \includegraphics[height=3cm, width=0.5\textwidth, keepaspectratio]{figs/chart.png}
+  \includegraphics{figs/photo.jpg}
+\end{frame}
+
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+    let editor = result.editor();
+
+    // 1. 他のオプションを維持したまま `width` のみを置換する。
+    let ed1 = editor
+        .set_image_width(0, 0, "0.8\\textwidth")
+        .expect("画像幅の更新に失敗。");
+    let frames1 = ed1.get_frames().expect("スライド取得に失敗。");
+    let images1 = frames1[0].images();
+    assert_eq!(images1.len(), 2);
+    let opts1 = images1[0].options_text().expect("オプション取得に失敗。");
+    assert!(opts1.contains("width=0.8\\textwidth"));
+    assert!(opts1.contains("height=3cm"));
+    assert!(opts1.contains("keepaspectratio"));
+
+    // 2. オプションが存在しない画像へ `width` を新規追加する。
+    let ed2 = ed1
+        .set_image_width(0, 1, "10cm")
+        .expect("新規オプション追加に失敗。");
+    let frames2 = ed2.get_frames().expect("スライド取得に失敗。");
+    let images2 = frames2[0].images();
+    let opts2 = images2[1].options_text().expect("オプション取得に失敗。");
+    assert_eq!(opts2, "width=10cm");
+
+    // 3. 画像パス `{...}` を置換する。
+    let ed3 = ed2
+        .set_image_path(0, 1, "figs/new_photo.png")
+        .expect("画像パス更新に失敗。");
+    let frames3 = ed3.get_frames().expect("スライド取得に失敗。");
+    let images3 = frames3[0].images();
+    assert_eq!(
+        images3[1].path_text().as_deref(),
+        Some("figs/new_photo.png")
+    );
+
+    // 4. 範囲外の画像インデックス指定時のエラーを検証する。
+    assert!(matches!(
+        ed3.set_image_width(0, 99, "10cm"),
+        Err(EditError::IndexOutOfBounds { index: 99, max: 2 })
+    ));
+}
+
+#[test]
+fn test_property_edit_vspace() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+
+\begin{frame}{余白調整テスト}
+  上部テキスト
+  \begin{block}{ブロック}
+    中身
+  \end{block}
+  下部テキスト
+\end{frame}
+
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+    let editor = result.editor();
+
+    // 1. スライド本文先頭への `\vspace` 挿入を検証する。
+    let ed1 = editor
+        .insert_frame_vspace(0, "10pt", true)
+        .expect("先頭へのvspace挿入に失敗。");
+    assert!(ed1.text().contains("\\vspace{10pt}"));
+
+    // 2. スライド末尾(`\end{frame}` 直前)への `\vspace` 挿入を検証する。
+    let ed2 = ed1
+        .insert_frame_vspace(0, "5mm", false)
+        .expect("末尾へのvspace挿入に失敗。");
+    assert!(ed2.text().contains("\\vspace{5mm}"));
+
+    // 3. 特定ブロックノードの直後への `\vspace` 挿入を検証する。
+    let frames2 = ed2.get_frames().expect("スライド取得に失敗。");
+    let blocks = frames2[0].blocks();
+    assert_eq!(blocks.len(), 1);
+
+    let ed3 = ed2
+        .insert_vspace_around_node(blocks[0].syntax(), "1em", true)
+        .expect("ノード直後へのvspace挿入に失敗。");
+    assert!(ed3.text().contains("\\vspace{1em}"));
+}
+
+#[test]
+fn test_property_edit_replace_node_and_range() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+
+\begin{frame}{置換テスト}
+  \begin{block}{置換前ブロック}
+    ブロック本文
+  \end{block}
+\end{frame}
+
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+    let editor = result.editor();
+
+    let frames = editor.get_frames().expect("スライド取得に失敗。");
+    let blocks = frames[0].blocks();
+    assert_eq!(blocks.len(), 1);
+
+    // 1. ブロックノード全体を別のコード片で置換する。
+    let new_block = "  % ブロックをコメントに置換\n";
+    let ed1 = editor
+        .replace_node(blocks[0].syntax(), new_block)
+        .expect("ノード置換に失敗。");
+    assert!(ed1.text().contains("% ブロックをコメントに置換"));
+    assert!(!ed1.text().contains("置換前ブロック"));
+
+    // 2. 任意の TextRange の置換を検証する。
+    let title_range = ed1.get_frames().unwrap()[0]
+        .node()
+        .title_node()
+        .unwrap()
+        .text_range();
+    let ed2 = ed1
+        .replace_range(title_range, "{置換後タイトル}")
+        .expect("範囲置換に失敗。");
+    assert_eq!(
+        ed2.get_frames().unwrap()[0].title_text().as_deref(),
+        Some("置換後タイトル")
+    );
+}

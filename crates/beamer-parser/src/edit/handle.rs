@@ -149,6 +149,43 @@ impl FrameHandle {
     pub fn pause_commands(&self) -> Vec<PauseNode> {
         self.node.pause_commands()
     }
+
+    /// 当該スライドのタイトルを更新する。
+    pub fn set_title(
+        &self,
+        editor: &crate::edit::DocumentEditor,
+        title: &str,
+    ) -> Result<crate::edit::DocumentEditor, crate::edit::EditError> {
+        editor.set_frame_title(self.index, title)
+    }
+
+    /// 当該スライドのサブタイトルを更新する。
+    pub fn set_subtitle(
+        &self,
+        editor: &crate::edit::DocumentEditor,
+        subtitle: &str,
+    ) -> Result<crate::edit::DocumentEditor, crate::edit::EditError> {
+        editor.set_frame_subtitle(self.index, subtitle)
+    }
+
+    /// 当該スライドのオプション引数を更新する。
+    pub fn set_options(
+        &self,
+        editor: &crate::edit::DocumentEditor,
+        options: &str,
+    ) -> Result<crate::edit::DocumentEditor, crate::edit::EditError> {
+        editor.set_frame_options(self.index, options)
+    }
+
+    /// 当該スライド内の指定画像の幅を更新する。
+    pub fn set_image_width(
+        &self,
+        editor: &crate::edit::DocumentEditor,
+        image_index: usize,
+        width: &str,
+    ) -> Result<crate::edit::DocumentEditor, crate::edit::EditError> {
+        editor.set_image_width(self.index, image_index, width)
+    }
 }
 
 /// ドキュメント内のセクション境界を特定・操作するためのハンドル型。

@@ -23,6 +23,12 @@ pub enum EditError {
         /// 有効な要素数。
         max: usize,
     },
+
+    /// 対象の要素（画像やタイトルなど）が見つからない。
+    ElementNotFound {
+        /// エラーの詳細メッセージ。
+        message: String,
+    },
 }
 
 impl fmt::Display for EditError {
@@ -46,6 +52,9 @@ impl fmt::Display for EditError {
                     "インデックス {} は範囲外である(有効要素数: {})。",
                     index, max
                 )
+            }
+            Self::ElementNotFound { message } => {
+                write!(f, "対象要素が見つからない: {}", message)
             }
         }
     }
