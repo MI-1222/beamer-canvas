@@ -36,7 +36,7 @@ export function App() {
     <div className='flex h-screen w-screen flex-col bg-panel-bg text-zinc-100'>
       <header className='flex h-12 shrink-0 items-center border-b border-border-subtle bg-panel-header px-4'>
         <h1 className='text-sm font-semibold tracking-wide'>
-          Beamer Editor - Setup Verification
+          BeamerCanvas - Setup Verification
         </h1>
       </header>
       <main className='flex flex-1 overflow-hidden'>

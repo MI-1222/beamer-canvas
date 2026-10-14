@@ -16,7 +16,7 @@ use report::{GateStatus, VerificationReport};
 use std::fs;
 use std::path::PathBuf;
 
-/// `beamer-editor` コア基盤総合検証CLIツール。
+/// `BeamerCanvas` コア基盤総合検証CLIツール。
 #[derive(Parser, Debug)]
 #[command(name = "beamer-verify")]
 #[command(about = "LaTeX Beamer コア基盤の品質検証およびGate Criteria判定ツール", long_about = None)]

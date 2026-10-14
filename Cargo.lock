@@ -183,17 +183,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
-name = "beamer-core"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "beamer-editor-app"
+name = "beamer-canvas-app"
 version = "0.1.0"
 dependencies = [
  "beamer-core",
@@ -203,6 +193,16 @@ dependencies = [
  "serde",
  "tauri",
  "tauri-build",
+]
+
+[[package]]
+name = "beamer-core"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

@@ -1,1 +1,1 @@
-# beamer-editor
+# BeamerCanvas

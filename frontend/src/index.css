@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* Beamer Editor デザイントークン定義。 */
+/* BeamerCanvas デザイントークン定義。 */
 @theme {
   --color-canvas-bg: #1e1e24;
   --color-panel-bg: #18181b;
