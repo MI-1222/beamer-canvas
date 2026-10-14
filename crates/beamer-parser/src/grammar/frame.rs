@@ -40,6 +40,11 @@ pub fn parse_frame_env(ctx: &mut ParserContext<'_, '_>) {
 
         // 行末コメントおよび直後の単一改行をノード内に取り込む。
         ctx.consume_trailing_trivia();
+    } else {
+        ctx.errors
+            .push("`frame` 環境の閉じタグが見つからない。".to_string());
+        ctx.start_node(SyntaxKind::ErrorNode);
+        ctx.finish_node();
     }
 
     ctx.finish_node();
@@ -129,6 +134,7 @@ pub fn parse_legacy_frame(ctx: &mut ParserContext<'_, '_>) {
     if ctx.source.at(SyntaxKind::LBrace) {
         ctx.bump();
         let mut depth: usize = 1;
+        let mut closed = false;
         while !ctx.source.is_eof() {
             if ctx.source.at(SyntaxKind::LBrace) {
                 depth += 1;
@@ -137,6 +143,7 @@ pub fn parse_legacy_frame(ctx: &mut ParserContext<'_, '_>) {
                 depth -= 1;
                 ctx.bump();
                 if depth == 0 {
+                    closed = true;
                     break;
                 }
             } else {
@@ -144,8 +151,15 @@ pub fn parse_legacy_frame(ctx: &mut ParserContext<'_, '_>) {
             }
         }
 
-        // 行末コメントおよび直後の単一改行をノード内に取り込む。
-        ctx.consume_trailing_trivia();
+        if !closed {
+            ctx.errors
+                .push("旧式 `\\frame` マクロの閉じ波括弧が見つからない。".to_string());
+            ctx.start_node(SyntaxKind::ErrorNode);
+            ctx.finish_node();
+        } else {
+            // 行末コメントおよび直後の単一改行をノード内に取り込む。
+            ctx.consume_trailing_trivia();
+        }
     }
 
     ctx.finish_node();

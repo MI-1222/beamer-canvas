@@ -687,3 +687,143 @@ fn test_parse_complex_frame_with_all_elements() {
     let pauses = frame.pause_commands();
     assert_eq!(pauses.len(), 1);
 }
+
+#[test]
+fn test_parse_unclosed_environments_recovery() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}{閉じタグ欠落テスト}
+  \begin{block}{未完のブロック}
+    本文テキスト
+  % `block` の `\end{block}` がないまま `frame` が終了する。
+\end{frame}
+
+\begin{frame}{後続の正常スライド}
+  \begin{itemize}
+    \item 項目1
+    % `itemize` の `\end{itemize}` がないまま `frame` が終了する。
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // ロスレス完全一致を検証する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    // 構文解析エラーが検出され、`ErrorNode` が記録されることを検証する。
+    assert!(result.has_errors());
+    assert!(!result.error_nodes().is_empty());
+
+    // 2枚のスライドがどちらも `frame` として認識されていることを検証する。
+    let frames = result.frames();
+    assert_eq!(frames.len(), 2);
+
+    let f0 = FrameNode::new(&frames[0]).expect("FrameNode である。");
+    assert_eq!(f0.title_text().as_deref(), Some("閉じタグ欠落テスト"));
+    assert!(f0.has_errors());
+    assert_eq!(f0.blocks().len(), 1);
+
+    let f1 = FrameNode::new(&frames[1]).expect("FrameNode である。");
+    assert_eq!(f1.title_text().as_deref(), Some("後続の正常スライド"));
+    assert!(f1.has_errors());
+    assert_eq!(f1.lists().len(), 1);
+}
+
+#[test]
+fn test_parse_unclosed_document_recovery() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}
+  スライド本文
+\end{frame}
+% `\end{document}` が存在しない。
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // ロスレス完全一致を検証する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    assert!(result.has_errors());
+    assert!(!result.error_nodes().is_empty());
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 1);
+}
+
+#[test]
+fn test_parse_opaque_macro_and_math_blocks() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}{不透明要素のテスト}
+  \textbf{太字テキスト} と \custommacro<1->[opt]{引数1}{引数2}。
+  インライン数式 $E = mc^2$ と別行立て数式:
+  $$ \int_{0}^{1} f(x) dx $$
+  ローカルスコープ: { \small 小さい文字 }
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // ロスレス完全一致を検証する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 1);
+
+    let frame = FrameNode::new(&frames[0]).expect("FrameNode である。");
+
+    // 不透明マクロノード `\textbf`、`\custommacro`、`\small` を検証する。
+    let opaque_macros = frame.opaque_macros();
+    assert!(opaque_macros.len() >= 2);
+
+    // 不透明ブロックノード(インライン数式、別行立て数式、中括弧グループ)を検証する。
+    let opaque_blocks = frame.opaque_blocks();
+    assert!(opaque_blocks.len() >= 3);
+}
+
+#[test]
+fn test_parse_syntax_error_recovery() {
+    let source = r#"\documentclass{beamer}
+\begin{document}
+\begin{frame}{エラー回復テスト}
+  孤立した閉じタグ: \end{block}
+  不完全なタグ: \begin
+  孤立した括弧: } ]
+  未完の数式: $x + y
+  \begin{block}{正常なブロック}
+    通常本文。
+  \end{block}
+\end{frame}
+
+\begin{frame}{後続の無事なスライド}
+  正常な本文。
+\end{frame}
+\end{document}
+"#;
+
+    let parser = BeamerParser::new();
+    let result = parser.parse(source);
+
+    // 構文破壊が存在しても中断せず、入力全体を100%保持する。
+    assert_eq!(result.syntax().text().to_string(), source);
+
+    // エラーが記録され、`ErrorNode` に隔離されることを検証する。
+    assert!(result.has_errors());
+    assert!(!result.error_nodes().is_empty());
+
+    let frames = result.frames();
+    assert_eq!(frames.len(), 2);
+
+    let f0 = FrameNode::new(&frames[0]).expect("FrameNode である。");
+    assert!(f0.has_errors());
+    assert_eq!(f0.blocks().len(), 1);
+
+    let f1 = FrameNode::new(&frames[1]).expect("FrameNode である。");
+    assert!(!f1.has_errors());
+}

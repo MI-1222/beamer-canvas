@@ -59,6 +59,20 @@ impl ParseResult {
             .filter(|node| matches!(node.kind(), SyntaxKind::Section | SyntaxKind::Subsection))
             .collect()
     }
+
+    /// 構文解析中にエラーが検出されたかを判定する。
+    #[inline]
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    /// 構文木内に含まれるすべてのエラーノード `SyntaxKind::ErrorNode` を取得する。
+    pub fn error_nodes(&self) -> Vec<SyntaxNode> {
+        self.syntax
+            .descendants()
+            .filter(|node| node.kind() == SyntaxKind::ErrorNode)
+            .collect()
+    }
 }
 
 /// ソースコードから具象構文木 `CST` を構築するパーサー構造体。
@@ -137,6 +151,10 @@ impl BeamerParser {
                             let token = source.bump().expect("タグ範囲内のトークンが存在する。");
                             builder.token(token.kind.into(), token.text);
                         }
+                    } else {
+                        errors.push("`document` 環境の閉じタグが見つからない。".to_string());
+                        builder.start_node(SyntaxKind::ErrorNode.into());
+                        builder.finish_node();
                     }
 
                     builder.finish_node();
@@ -328,6 +346,29 @@ impl FrameNode {
         self.syntax
             .descendants()
             .filter_map(|n| PauseNode::new(&n))
+            .collect()
+    }
+
+    /// フレーム配下にエラーノードが含まれているかを判定する。
+    pub fn has_errors(&self) -> bool {
+        self.syntax
+            .descendants()
+            .any(|n| n.kind() == SyntaxKind::ErrorNode)
+    }
+
+    /// フレーム配下の不透明マクロノード `SyntaxKind::OpaqueMacro` をすべて取得する。
+    pub fn opaque_macros(&self) -> Vec<SyntaxNode> {
+        self.syntax
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::OpaqueMacro)
+            .collect()
+    }
+
+    /// フレーム配下の不透明ブロックノード `SyntaxKind::OpaqueBlock` をすべて取得する。
+    pub fn opaque_blocks(&self) -> Vec<SyntaxNode> {
+        self.syntax
+            .descendants()
+            .filter(|n| n.kind() == SyntaxKind::OpaqueBlock)
             .collect()
     }
 }

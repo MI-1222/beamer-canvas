@@ -1,7 +1,10 @@
-//! `frame` 内部の各種構文要素（ブロック、段組み、箇条書き、画像など）の構文解析モジュール。
+//! `frame` 内部の各種構文要素(ブロック、段組み、箇条書き、画像など)の構文解析モジュール。
 
 use super::ParserContext;
-use super::utils::{parse_argument, parse_bracket_options, parse_overlay_spec};
+use super::utils::{
+    parse_argument, parse_bracket_options, parse_inline_math, parse_opaque_macro,
+    parse_overlay_spec,
+};
 use crate::syntax::SyntaxKind;
 
 /// `frame` 本文に含まれるすべての内部要素をパースする。
@@ -31,7 +34,8 @@ pub fn parse_elements_until(ctx: &mut ParserContext<'_, '_>, stop_envs: &[&str],
             break;
         }
 
-        // 4. `frame` や `document` の開始タグに遭遇した場合は、閉じタグの欠落とみなしてループを抜ける。
+        // `frame` や `document` の開始タグ、または後続のセクション・スライドコマンドに遭遇した場合は、
+        // 閉じタグ欠落とみなしてパースを中断する。
         if ctx.source.is_at_env_begin_boundary("frame")
             || ctx.source.is_at_env_begin_boundary("document")
         {
@@ -40,9 +44,20 @@ pub fn parse_elements_until(ctx: &mut ParserContext<'_, '_>, stop_envs: &[&str],
             break;
         }
 
+        if stop_envs.contains(&"frame")
+            && (ctx.source.is_at_command_boundary("\\section")
+                || ctx.source.is_at_command_boundary("\\subsection")
+                || ctx.source.is_at_command_boundary("\\frame"))
+        {
+            ctx.errors.push(
+                "閉じタグが見つからないまま次のセクションまたはスライドへ到達した。".to_string(),
+            );
+            break;
+        }
+
         let prev_cursor = ctx.source.cursor();
 
-        // 5. 環境開始タグを分岐処理する。
+        // 正常な環境の開始タグを解析する。
         if let Some(env_name) = ctx.source.current_env_begin_boundary_name() {
             match env_name {
                 "block" | "exampleblock" | "alertblock" => {
@@ -69,19 +84,62 @@ pub fn parse_elements_until(ctx: &mut ParserContext<'_, '_>, stop_envs: &[&str],
                 }
             }
         }
-        // 6. 単独コマンドを分岐処理する。
+        // 単独コマンドおよび既知のマクロを解析する。
         else if ctx.source.is_at_command_boundary("\\column") {
             parse_column_macro(ctx);
         } else if ctx.source.is_at_command_boundary("\\item") {
-            // リスト環境直下で `\item` を見つけた場合。
+            // リスト環境の直下で `\item` を見つけた場合。
             parse_item(ctx, stop_envs);
         } else if ctx.source.is_at_command_boundary("\\includegraphics") {
             parse_includegraphics_cmd(ctx);
         } else if ctx.source.is_at_command_boundary("\\pause") {
             parse_pause_cmd(ctx);
-        } else if ctx.source.at(SyntaxKind::LAngle) {
-            // インラインで現れる単独のオーバーレイスペック `<...>`。
+        }
+        // 開きタグのない孤立した環境終了タグ `\end{...}` を `SyntaxKind::ErrorNode` として消費する。
+        else if let Some(orphan_env) = ctx.source.current_env_end_boundary_name() {
+            ctx.errors.push(format!(
+                "予期しない閉じタグ `\\end{{{orphan_env}}}` が出現した。"
+            ));
+            ctx.start_node(SyntaxKind::ErrorNode);
+            ctx.eat_whitespace();
+            consume_env_tag(ctx);
+            ctx.consume_trailing_trivia();
+            ctx.finish_node();
+        }
+        // 引数の中括弧がない不完全な `\begin` や `\end` を `SyntaxKind::ErrorNode` として消費する。
+        else if ctx.source.is_at_command_boundary("\\begin")
+            || ctx.source.is_at_command_boundary("\\end")
+        {
+            ctx.errors
+                .push("不完全または不正な環境タグが出現した。".to_string());
+            ctx.start_node(SyntaxKind::ErrorNode);
+            ctx.eat_whitespace();
+            ctx.bump();
+            ctx.finish_node();
+        }
+        // 開き括弧のない孤立した閉じ括弧 `}` や `]` を `SyntaxKind::ErrorNode` として消費する。
+        else if ctx.source.at(SyntaxKind::RBrace) || ctx.source.at(SyntaxKind::RBracket) {
+            ctx.errors
+                .push("対応する開き括弧がない閉じ括弧が出現した。".to_string());
+            ctx.start_node(SyntaxKind::ErrorNode);
+            ctx.bump();
+            ctx.finish_node();
+        }
+        // インライン数式 `$...$` または別行立て数式 `$$...$$` を `SyntaxKind::OpaqueBlock` として解析する。
+        else if ctx.source.at(SyntaxKind::Dollar) || ctx.source.at(SyntaxKind::DoubleDollar) {
+            parse_inline_math(ctx);
+        }
+        // 単独の中括弧グループ `{...}` を `SyntaxKind::OpaqueBlock` として解析する。
+        else if ctx.source.at(SyntaxKind::LBrace) {
+            parse_argument(ctx, SyntaxKind::OpaqueBlock);
+        }
+        // 単独のオーバーレイスペック `<...>` を解析する。
+        else if ctx.source.at(SyntaxKind::LAngle) {
             parse_overlay_spec(ctx);
+        }
+        // 構造解析の対象外である未知またはその他のマクロを `SyntaxKind::OpaqueMacro` として解析する。
+        else if ctx.source.at(SyntaxKind::Command) {
+            parse_opaque_macro(ctx);
         } else {
             ctx.bump();
         }
@@ -135,6 +193,8 @@ pub fn parse_block_env(ctx: &mut ParserContext<'_, '_>, env_name: &str) {
     } else {
         ctx.errors
             .push(format!("`{env_name}` 環境の閉じタグが見つからない。"));
+        ctx.start_node(SyntaxKind::ErrorNode);
+        ctx.finish_node();
     }
 
     ctx.finish_node();
@@ -170,6 +230,8 @@ pub fn parse_columns_env(ctx: &mut ParserContext<'_, '_>) {
     } else {
         ctx.errors
             .push("`columns` 環境の閉じタグが見つからない。".to_string());
+        ctx.start_node(SyntaxKind::ErrorNode);
+        ctx.finish_node();
     }
 
     ctx.finish_node();
@@ -216,6 +278,8 @@ pub fn parse_column_env(ctx: &mut ParserContext<'_, '_>) {
     } else {
         ctx.errors
             .push("`column` 環境の閉じタグが見つからない。".to_string());
+        ctx.start_node(SyntaxKind::ErrorNode);
+        ctx.finish_node();
     }
 
     ctx.finish_node();
@@ -291,6 +355,8 @@ pub fn parse_list_env(ctx: &mut ParserContext<'_, '_>, kind: SyntaxKind, env_nam
     } else {
         ctx.errors
             .push(format!("`{env_name}` 環境の閉じタグが見つからない。"));
+        ctx.start_node(SyntaxKind::ErrorNode);
+        ctx.finish_node();
     }
 
     ctx.finish_node();
@@ -387,6 +453,8 @@ pub fn parse_opaque_env(ctx: &mut ParserContext<'_, '_>, kind: SyntaxKind, env_n
     ctx.eat_whitespace();
     consume_env_tag(ctx);
 
+    let mut closed = false;
+
     // 対応する `\end{env_name}` またはフレーム終了までを平坦に消費する。
     while !ctx.source.is_eof() && !ctx.source.is_at_env_end_boundary(env_name) {
         if ctx.source.is_at_env_begin_boundary("frame")
@@ -404,6 +472,12 @@ pub fn parse_opaque_env(ctx: &mut ParserContext<'_, '_>, kind: SyntaxKind, env_n
         ctx.eat_whitespace();
         consume_env_tag(ctx);
         ctx.consume_trailing_trivia();
+        closed = true;
+    }
+
+    if !closed {
+        ctx.start_node(SyntaxKind::ErrorNode);
+        ctx.finish_node();
     }
 
     ctx.finish_node();
