@@ -1,0 +1,54 @@
+\documentclass[aspectratio=169]{beamer}
+\usetheme{metropolis}
+\usepackage{amsmath}
+
+\title{Modern Presentation with Metropolis}
+\subtitle{Minimal and Elegant Beamer Theme}
+\author{Antigravity Developer}
+\institute{Advanced Agentic Institute}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{frame}{Table of Contents}
+  \setbeamertemplate{section in toc}[sections numbered]
+  \tableofcontents[hideallsubsections]
+\end{frame}
+
+\section{Introduction}
+
+\begin{frame}[fragile]{Overview of Architecture}
+  \framesubtitle{Design goals and foundational ideas}
+  This slide introduces the fundamental goals of the platform.
+
+  \begin{itemize}
+    \item High performance CST manipulation with lossless preservation.
+    \item Instant visual feedback using multi-layer caching.
+    \item Direct bidirectional synchronization between text and GUI.
+  \end{itemize}
+\end{frame}
+
+\section{Core Layout}
+
+\begin{frame}{Two-Column Layout Example}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Left Block}
+        Key advantages of structural island parsing:
+        \begin{itemize}
+          \item Safe boundary isolation
+          \item Uncompromised syntax integrity
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{Important Notice}
+        All tokens including trivia and comments must be strictly preserved.
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

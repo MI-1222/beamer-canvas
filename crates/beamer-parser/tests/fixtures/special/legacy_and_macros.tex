@@ -1,0 +1,31 @@
+\documentclass{beamer}
+
+% Custom macro definitions
+\newcommand{\highlight}[1]{\textbf{\textcolor{blue}{#1}}}
+\def\myconstant{42}
+
+\title{Custom Macros and Legacy Commands}
+\author{Compiler Group}
+
+\begin{document}
+
+% Frame without environment title, using \frametitle inside
+\begin{frame}[fragile]
+  \frametitle{Frametitle Macro and Verbatim Content}
+  Here is some highlighted text: \highlight{important concept}.
+  Constant value is \myconstant.
+
+  \begin{verbatim}
+    fn main() {
+        println!("Hello, Beamer!");
+    }
+  \end{verbatim}
+\end{frame}
+
+% Legacy \frame macro invocation
+\frame{
+  \frametitle{Legacy Frame Syntax}
+  This slide uses the old style backslash-frame macro rather than begin-end environment.
+}
+
+\end{document}

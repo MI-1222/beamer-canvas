@@ -1,0 +1,2 @@
+crates/beamer-parser/tests/fixtures/** text eol=lf
+crates/beamer-parser/tests/fixtures/special/crlf_mixed.tex text eol=crlf

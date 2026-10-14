@@ -1,0 +1,42 @@
+\documentclass{beamer}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning}
+
+\title{Graphics, TikZ and Tables}
+\author{Design Engineering}
+
+\begin{document}
+
+\begin{frame}{Complex TikZ Diagrams}
+  \begin{center}
+    \begin{tikzpicture}[node distance=2cm, auto, >=latex']
+      \node [rectangle, draw, fill=blue!20, text width=5em, text centered, rounded corners] (init) {Initialize};
+      \node [diamond, draw, fill=green!20, text width=4.5em, text badly centered, below of=init] (identify) {Check State};
+      \node [block, right of=identify, node distance=3cm] (update) {Update Cache};
+
+      \draw [->] (init) -- (identify);
+      \draw [->] (identify) -- node {yes} (update);
+      \draw [->] (update) |- (init);
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Overlay Annotation and Tabular Data}
+  \begin{tikzpicture}[remember picture, overlay]
+    \node [anchor=north east, xshift=-1cm, yshift=-1cm] at (current page.north east) {
+      \includegraphics[width=2cm]{figures/badge.pdf}
+    };
+  \end{tikzpicture}
+
+  \begin{tabular}{|l|c|r|}
+    \hline
+    Component & Layer & Latency (ms) \\
+    \hline
+    Lexer & Core & 0.45 \\
+    Parser & Rowan & 1.20 \\
+    Rasterizer & PDFium & 1.98 \\
+    \hline
+  \end{tabular}
+\end{frame}
+
+\end{document}

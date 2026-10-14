@@ -1,0 +1,37 @@
+\documentclass{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+
+% Preamble comments to ensure trivia preservation
+\title[Short Title]{Full Presentation Title in Madrid}
+\author[Author]{Lead Researcher}
+\institute[Inst]{Research Laboratory}
+\date[2026]{October 2026}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\section{Methodology}
+\subsection{Step-by-step Execution}
+
+\begin{frame}<1-3>{Incremental Revealing and Blocks}
+  \framesubtitle{Demonstrating pause and example blocks}
+  First point visible immediately.
+  \pause
+
+  \begin{exampleblock}{Example Case}
+    This example appears on overlay step 2.
+    \begin{enumerate}
+      \item Initial condition verified.
+      \item Invariant holds across iterations.
+    \end{enumerate}
+  \end{exampleblock}
+
+  \pause
+  Final conclusion visible on step 3.
+\end{frame}
+
+\end{document}

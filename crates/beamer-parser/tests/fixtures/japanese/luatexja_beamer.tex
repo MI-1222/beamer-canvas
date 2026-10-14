@@ -1,0 +1,36 @@
+% LuaLaTeX-ja による日本語Beamerスライド
+\documentclass[unicode]{beamer}
+\usepackage{luatexja}
+\usepackage{luatexja-fontspec}
+\usetheme{Madrid}
+
+\title{日本語組版とBeamerスライド}
+\subtitle{LuaTeX-ja環境におけるマルチバイト検証}
+\author{開発チーム}
+\institute{次世代エディタ研究所}
+\date{2026年10月}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\section{概要と背景}
+
+\begin{frame}{日本語組版の課題と対策}
+  \framesubtitle{全角文字とインライン記号の共存}
+  日本語組版では、約物(「」『』【】・※★)や全角空白の混在に注意が必要です。
+
+  \begin{itemize}
+    \item 具象構文木(CST)による完全ロスレス表現
+    \item マルチバイトUTF-8境界でのオフセット計算の整合性
+    \item 日本語コメント行の改行コード保持(LF / CRLF)
+  \end{itemize}
+
+  \begin{block}{確認事項}
+    パースおよび再文字列化において、1バイトのズレも生じないことを確認します。
+  \end{block}
+\end{frame}
+
+\end{document}

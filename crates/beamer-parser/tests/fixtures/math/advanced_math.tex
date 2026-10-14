@@ -1,0 +1,43 @@
+\documentclass{beamer}
+\usepackage{amsmath,amssymb,mathtools}
+
+\title{Mathematical Formulations in Beamer}
+\author{Mathematics Department}
+
+\begin{document}
+
+\begin{frame}{Advanced Equation Derivations}
+  Consider the optimization problem defined as follows:
+  \begin{equation}
+    \min_{x \in \mathbb{R}^n} f(x) = \frac{1}{2} x^T Q x - c^T x
+  \end{equation}
+  where $Q \in \mathbb{S}_{++}^n$ is symmetric positive definite.
+
+  \pause
+
+  \begin{align*}
+    \nabla f(x) &= Q x - c = 0 \\
+    x^* &= Q^{-1} c
+  \end{align*}
+
+  The cost at optimal point $x^*$ satisfies:
+  $$f(x^*) = -\frac{1}{2} c^T Q^{-1} c < 0.$$
+\end{frame}
+
+\begin{frame}{Theoretical Properties and Proof}
+  \begin{block}{Theorem 1 (Convergence Rate)}
+    Under the assumption that $\alpha \le \frac{2}{\lambda_{\max}(Q)}$, gradient descent satisfies:
+    \begin{equation*}
+      \|x_{k+1} - x^*\| \le \rho \|x_k - x^*\|
+    \end{equation*}
+    with contraction factor $\rho < 1$.
+  \end{block}
+
+  \begin{proof}
+    Direct expansion of the recursive relation yields:
+    $x_{k+1} - x^* = (I - \alpha Q)(x_k - x^*).$
+    Taking operator norms on both sides completes the proof.
+  \end{proof}
+\end{frame}
+
+\end{document}
