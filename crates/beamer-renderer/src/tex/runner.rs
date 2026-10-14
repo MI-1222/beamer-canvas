@@ -71,15 +71,46 @@ impl TexRunner {
         working_dir: &Path,
         tx: Sender<LogMessage>,
     ) -> Result<CompileOutput> {
-        let mut child = Command::new(program)
-            .args(args)
-            .current_dir(working_dir)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
+        self.run_command_streaming_cancellable(
+            program,
+            args,
+            working_dir,
+            &[],
+            tx,
+            tokio_util::sync::CancellationToken::new(),
+        )
+        .await
+    }
 
-        let stdout = child.stdout.take();
-        let stderr = child.stderr.take();
+    /// `CancellationToken` を監視しながらコマンドを非同期実行する。
+    ///
+    /// プロセスグループを生成して起動し、キャンセル時には子孫プロセスを含めて安全に強制終了する。
+    pub async fn run_command_streaming_cancellable(
+        &self,
+        program: &str,
+        args: &[&str],
+        working_dir: &Path,
+        env_vars: &[(&str, &str)],
+        tx: Sender<LogMessage>,
+        cancel_token: tokio_util::sync::CancellationToken,
+    ) -> Result<CompileOutput> {
+        use command_group::AsyncCommandGroup;
+
+        let mut cmd = Command::new(program);
+        cmd.args(args)
+            .current_dir(working_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        for (key, val) in env_vars {
+            cmd.env(key, val);
+        }
+
+        let mut child = cmd.group_spawn()?;
+
+        let stdout = child.inner().stdout.take();
+        let stderr = child.inner().stderr.take();
 
         let tx_stdout = tx.clone();
         let stdout_task = tokio::spawn(async move {
@@ -119,26 +150,40 @@ impl TexRunner {
             captured.join("\n")
         });
 
-        let status = child.wait().await?;
-        let stdout_str = stdout_task.await.unwrap_or_default();
-        let stderr_str = stderr_task.await.unwrap_or_default();
+        tokio::select! {
+            biased;
 
-        let success = status.success();
-        let exit_code = status.code();
+            _ = cancel_token.cancelled() => {
+                let _ = child.start_kill();
+                let _ = child.wait().await;
+                stdout_task.abort();
+                stderr_task.abort();
+                Err(RenderError::Cancelled)
+            }
 
-        if !success {
-            return Err(RenderError::CompileFailed {
-                exit_code,
-                stderr: stderr_str,
-            });
+            status_res = child.wait() => {
+                let status = status_res?;
+                let stdout_str = stdout_task.await.unwrap_or_default();
+                let stderr_str = stderr_task.await.unwrap_or_default();
+
+                let success = status.success();
+                let exit_code = status.code();
+
+                if !success {
+                    return Err(RenderError::CompileFailed {
+                        exit_code,
+                        stderr: stderr_str,
+                    });
+                }
+
+                Ok(CompileOutput {
+                    success,
+                    exit_code,
+                    stdout: stdout_str,
+                    stderr: stderr_str,
+                })
+            }
         }
-
-        Ok(CompileOutput {
-            success,
-            exit_code,
-            stdout: stdout_str,
-            stderr: stderr_str,
-        })
     }
 
     /// 指定した実行可能ファイルがシステム上に存在するか確認する。
