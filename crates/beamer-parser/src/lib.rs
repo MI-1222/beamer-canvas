@@ -21,3 +21,11 @@ pub use parser::{
 };
 pub use syntax::{LatexLanguage, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use token_source::TokenSource;
+
+/// LaTeX Beamerのソース文字列を解析し、ロスのない構文木を構築する。
+///
+/// `BeamerParser::new().parse(text)` を簡潔に呼び出す関数である。
+#[inline]
+pub fn parse(text: &str) -> ParseResult {
+    BeamerParser::new().parse(text)
+}

@@ -17,11 +17,23 @@ pub struct ParseResult {
     pub errors: Vec<String>,
 }
 
+impl std::fmt::Display for ParseResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.syntax.text())
+    }
+}
+
 impl ParseResult {
     /// ルート構文ノード `SyntaxKind::Root` の参照を取得する。
     #[inline]
     pub fn syntax(&self) -> &SyntaxNode {
         &self.syntax
+    }
+
+    /// 構文木全体のソーステキストを取得する。
+    #[inline]
+    pub fn text(&self) -> String {
+        self.syntax.text().to_string()
     }
 
     /// プリアンブル領域ノード `SyntaxKind::Preamble` を探索して取得する。
