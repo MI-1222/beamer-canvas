@@ -60,6 +60,23 @@ impl ParseResult {
             .collect()
     }
 
+    /// `DocumentEditor` インスタンスを生成する。
+    pub fn editor(&self) -> crate::edit::DocumentEditor {
+        crate::edit::DocumentEditor::new(self)
+    }
+
+    /// ドキュメント内のスライドフレームハンドル一覧を取得する。
+    ///
+    /// スライドフレーム内に構文エラーノード `ErrorNode` が存在する場合は `Err(EditError::SyntaxError)` を返す。
+    pub fn get_frames(&self) -> Result<Vec<crate::edit::FrameHandle>, crate::edit::EditError> {
+        self.editor().get_frames()
+    }
+
+    /// ドキュメント内のセクションハンドル一覧を取得する。
+    pub fn get_sections(&self) -> Result<Vec<crate::edit::SectionHandle>, crate::edit::EditError> {
+        self.editor().get_sections()
+    }
+
     /// 構文解析中にエラーが検出されたかを判定する。
     #[inline]
     pub fn has_errors(&self) -> bool {
