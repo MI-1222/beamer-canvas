@@ -3,10 +3,12 @@
 //! pdfページのラスタライズ、`TeX` コンパイルプロセスの監視、エラー処理、
 //! サンドボックス管理、および非同期ビルド調停を担当する。
 
+pub mod cache;
 pub mod error;
 pub mod pdf;
 pub mod tex;
 
+pub use cache::{SlideCache, SlideCacheConfig};
 pub use error::{RenderError, Result};
 pub use pdf::{PageBitmap, PdfRasterizer, RenderDpi};
 pub use tex::{

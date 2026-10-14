@@ -6,6 +6,6 @@ pub mod cache;
 pub mod error;
 pub mod project;
 
-pub use cache::ContentHasher;
+pub use cache::{AssetDependency, ContentHasher, SlideCacheKey};
 pub use error::{CoreError, Result};
 pub use project::{Project, ProjectConfig};

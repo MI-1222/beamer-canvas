@@ -49,6 +49,13 @@ pub enum RenderError {
         /// コマンド名。
         command: String,
     },
+
+    /// キャッシュのエンコード、デコード、またはファイル操作のエラー。
+    #[error("キャッシュ操作が原因で失敗しました: {message}")]
+    Cache {
+        /// 詳細メッセージ。
+        message: String,
+    },
 }
 
 /// レンダラーモジュールの汎用 `Result` 型エイリアス。
