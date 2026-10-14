@@ -177,6 +177,8 @@ version = "0.1.0"
 dependencies = [
  "beamer-core",
  "pdfium-render",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
