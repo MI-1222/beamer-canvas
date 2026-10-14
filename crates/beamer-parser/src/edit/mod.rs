@@ -1,12 +1,16 @@
 //! `CST`(`GreenNode`/`SyntaxNode`)の編集およびアウトライン操作モジュール。
 
 pub mod error;
+pub mod frame_edit;
 pub mod handle;
+pub mod text_edit;
 
 pub use error::EditError;
+pub use frame_edit::FrameEditor;
 pub use handle::{FrameHandle, SectionHandle};
+pub use text_edit::TextEdit;
 
-use crate::parser::{FrameNode, ParseResult, SectionNode};
+use crate::parser::{BeamerParser, FrameNode, ParseResult, SectionNode};
 use crate::syntax::{LatexLanguage, SyntaxKind, SyntaxNode};
 use rowan::ast::SyntaxNodePtr;
 
@@ -118,6 +122,77 @@ impl DocumentEditor {
     /// ドキュメント内のセクション総数を取得する。
     pub fn section_count(&self) -> Result<usize, EditError> {
         Ok(self.get_sections()?.len())
+    }
+
+    /// 指定された通し番号のスライドを別の位置へ移動する。
+    ///
+    /// スライド間に存在するセクションやコメントの位置はそのまま保持する。
+    pub fn move_frame(
+        &self,
+        from_index: usize,
+        to_index: usize,
+    ) -> Result<DocumentEditor, EditError> {
+        FrameEditor::move_frame(self, from_index, to_index)
+    }
+
+    /// 指定された2つのスライド位置を相互に入れ替える。
+    ///
+    /// スライド間に存在するセクションやコメントの位置はそのまま保持する。
+    pub fn swap_frames(&self, index_a: usize, index_b: usize) -> Result<DocumentEditor, EditError> {
+        FrameEditor::swap_frames(self, index_a, index_b)
+    }
+
+    /// 指定された通し番号のスライドを削除する。
+    pub fn delete_frame(&self, index: usize) -> Result<DocumentEditor, EditError> {
+        FrameEditor::delete_frame(self, index)
+    }
+
+    /// 指定された位置に新しいスライドを挿入する。
+    ///
+    /// `index == frame_count` の場合は末尾に追加する。
+    pub fn insert_frame(
+        &self,
+        index: usize,
+        frame_source: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        FrameEditor::insert_frame(self, index, frame_source)
+    }
+
+    /// ドキュメントの末尾に新しいスライドを追加する。
+    pub fn push_frame(&self, frame_source: &str) -> Result<DocumentEditor, EditError> {
+        let count = self.frame_count()?;
+        self.insert_frame(count, frame_source)
+    }
+
+    /// 既存のスライド群から代表的な行頭インデント文字列を検出する。
+    pub fn detect_indent(&self) -> String {
+        let frames = self.get_frames().unwrap_or_default();
+        FrameEditor::detect_indent(&frames)
+    }
+
+    /// ドキュメントのインデント傾向に合わせて新しいスライドを指定位置に挿入する。
+    pub fn insert_frame_with_auto_indent(
+        &self,
+        index: usize,
+        frame_source: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        let indent = self.detect_indent();
+        let formatted = FrameEditor::apply_indent(frame_source, &indent);
+        self.insert_frame(index, &formatted)
+    }
+
+    /// ドキュメントのインデント傾向に合わせて新しいスライドを末尾に追加する。
+    pub fn push_frame_with_auto_indent(
+        &self,
+        frame_source: &str,
+    ) -> Result<DocumentEditor, EditError> {
+        let count = self.frame_count()?;
+        self.insert_frame_with_auto_indent(count, frame_source)
+    }
+
+    /// 現在のエディタ状態から新しい構文解析結果 `ParseResult` を生成する。
+    pub fn to_parse_result(&self) -> ParseResult {
+        BeamerParser::new().parse(&self.text())
     }
 
     /// フレームとセクションの走査および関連付けを行う内部ヘルパー。
