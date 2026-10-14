@@ -1,0 +1,32 @@
+% LuaLaTeX / luatexja 用の Beamer 日本語スライド。
+\documentclass{beamer}
+\usepackage{luatexja}
+
+\usetheme{default}
+\title{人工知能による構文解析とプレゼンテーション生成}
+\subtitle{ロスレス具体構文木(CST)と非破壊的編集の実現}
+\author{研究開発チーム}
+\date{2026年10月}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\section{研究の背景と課題}
+
+\begin{frame}{研究背景と既存手法の限界}
+  \framesubtitle{全角記号「」や約物、※印を含む文書構造の検証}
+  \begin{itemize}
+    \item 従来のWYSIWYGツールでは、Gitによる版管理が困難。
+    \item LaTeXソースを直接編集する際、意図せぬコード破壊(コメント消失等)が発生しやすい。
+    \item 空白・改行・マルチバイト文字の1バイト単位での厳密な保持。
+  \end{itemize}
+
+  \begin{block}{提案手法の核となる着眼点}
+    中粒度アイランドパースを採用し、構造化対象外のマクロを安全に隔離する。
+  \end{block}
+\end{frame}
+
+\end{document}

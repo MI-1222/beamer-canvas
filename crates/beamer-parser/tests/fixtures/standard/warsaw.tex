@@ -1,0 +1,50 @@
+\documentclass{beamer}
+\usetheme{Warsaw}
+\usecolortheme{orchid}
+
+\title[Robotics Control]{Nonlinear Feedback Control for Autonomous Systems}
+\subtitle{Comprehensive Overview of Lyapunov Stability}
+\author[Dr. Researcher]{Lead Researcher}
+\institute[Univ. Lab]{Laboratory for Intelligent Robotics}
+\date[2026]{Annual Conference 2026}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\section{System Architecture}
+\subsection{Controller Formulation}
+
+\begin{frame}<1-2>{Multi-Column Layout and Dynamic Blocks}
+  \framesubtitle{Comparing Open-Loop and Closed-Loop Responses}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Open-Loop System}
+        \begin{itemize}
+          \item Highly sensitive to external noise.
+          \item No disturbance rejection.
+          \item Susceptible to parameter drift.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{Closed-Loop Feedback}
+        \begin{itemize}
+          \item Real-time state error monitoring.
+          \item Guaranteed stability via feedback.
+          \item Robust under modeling uncertainties.
+        \end{itemize}
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+
+  \pause
+  \vspace{0.3cm}
+  \begin{exampleblock}{Simulation Verification}
+    Transient response demonstrates zero steady-state error within 1.2 seconds.
+  \end{exampleblock}
+\end{frame}
+
+\end{document}

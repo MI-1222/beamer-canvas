@@ -1,0 +1,42 @@
+\documentclass{beamer}
+\usepackage{amsmath,amssymb,mathtools,amsthm}
+
+\usetheme{default}
+\title{Spectral Graph Theory and Laplacians}
+\author{Applied Mathematics Group}
+
+\newtheorem{conjecture}{Conjecture}
+
+\begin{document}
+
+\begin{frame}{Graph Laplacian and Quadratic Forms}
+  \framesubtitle{Discrete Potential Theory}
+  Let $G = (V, E)$ be an undirected, weighted graph with adjacency matrix $W$.
+  The combinatorial Laplacian $L$ is defined as:
+  \begin{equation}
+    L = D - W, \quad D_{ii} = \sum_{j \in V} W_{ij}
+  \end{equation}
+
+  \pause
+  For any real-valued potential vector $x \in \mathbb{R}^{|V|}$:
+  \begin{equation}
+    x^T L x = \frac{1}{2} \sum_{i,j \in V} W_{ij} (x_i - x_j)^2 \ge 0
+  \end{equation}
+  \pause
+  Hence $L$ is positive semidefinite ($L \succeq 0$) with trivial kernel $\mathbf{1} \in \ker(L)$.
+\end{frame}
+
+\begin{frame}{Cheeger Inequality and Conductance}
+  \begin{theorem}[Cheeger's Discrete Inequality]
+    Let $\lambda_2$ be the algebraic connectivity of $G$. The graph conductance $h(G)$ satisfies:
+    \begin{equation*}
+      \frac{\lambda_2}{2} \le h(G) \le \sqrt{2 \lambda_2}
+    \end{equation*}
+  \end{theorem}
+
+  \begin{conjecture}
+    Extension to directed hypergraphs admits a polynomial bound in high dimensions.
+  \end{conjecture}
+\end{frame}
+
+\end{document}
