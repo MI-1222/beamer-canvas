@@ -69,7 +69,9 @@ async fn test_process_failure_capture() {
 
     let result = handle.await.expect("タスク実行に失敗しました。");
     match result {
-        Err(RenderError::CompileFailed { exit_code, stderr }) => {
+        Err(RenderError::CompileFailed {
+            exit_code, stderr, ..
+        }) => {
             assert_eq!(exit_code, Some(42), "終了コード42を正しく取得できること。");
             assert!(
                 stderr.contains("fatal syntax error"),

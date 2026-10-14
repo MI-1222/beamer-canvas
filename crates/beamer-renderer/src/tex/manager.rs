@@ -204,15 +204,51 @@ impl BuildManager {
         let texinputs = sandbox.build_texinputs(&workdir);
         let env_vars = [("TEXINPUTS", texinputs.as_str())];
 
-        // 4. コンパイル対象ファイルの決定(インメモリテキストの書き出し対応)。
-        let target_file_path = if let Some(ref source) = request.source_override {
-            let temp_source_path = workdir.join(main_file_name);
-            fs::write(&temp_source_path, source).map_err(|e| RenderError::Sandbox {
-                message: format!("一時ソースファイルの書き込みに失敗しました: {e}"),
-            })?;
-            temp_source_path
-        } else {
-            request.project_root.join(&request.main_file)
+        // 4. コンパイル対象ファイルの決定(インメモリテキストの書き出しおよび部分コンパイルのフレーム指定対応)。
+        let target_file_path = match (&request.kind, &request.source_override) {
+            (_, Some(source)) => {
+                let temp_source_path = workdir.join(main_file_name);
+                fs::write(&temp_source_path, source).map_err(|e| RenderError::Sandbox {
+                    message: format!("一時ソースファイルの書き込みに失敗しました: {e}"),
+                })?;
+                temp_source_path
+            }
+            (
+                BuildKind::Partial {
+                    frame_label: Some(label),
+                },
+                None,
+            ) => {
+                // 部分コンパイルでラベルが指定されている場合、`\includeonlyframes{label}`をプリアンブル末尾に注入する。
+                let original_path = request.project_root.join(&request.main_file);
+                let original_source =
+                    fs::read_to_string(&original_path).map_err(|e| RenderError::InvalidPath {
+                        path: format!("{}: {}", original_path.display(), e),
+                    })?;
+
+                let include_directive = format!("\\includeonlyframes{{{label}}}\n");
+                let modified_source = if let Some(pos) = original_source.find("\\begin{document}") {
+                    let mut s =
+                        String::with_capacity(original_source.len() + include_directive.len());
+                    s.push_str(&original_source[..pos]);
+                    s.push_str(&include_directive);
+                    s.push_str(&original_source[pos..]);
+                    s
+                } else {
+                    format!("{include_directive}{original_source}")
+                };
+
+                let temp_source_path = workdir.join(main_file_name);
+                fs::write(&temp_source_path, modified_source).map_err(|e| {
+                    RenderError::Sandbox {
+                        message: format!(
+                            "部分コンパイル用一時ソースファイルの書き込みに失敗しました: {e}"
+                        ),
+                    }
+                })?;
+                temp_source_path
+            }
+            _ => request.project_root.join(&request.main_file),
         };
 
         // 5. 使用エンジンの決定。
@@ -255,14 +291,22 @@ impl BuildManager {
                 output.stderr,
             ),
             Err(RenderError::Cancelled) => return Err(RenderError::Cancelled),
-            Err(RenderError::CompileFailed { exit_code, stderr }) => {
-                (false, exit_code, String::new(), stderr)
-            }
+            Err(RenderError::CompileFailed {
+                exit_code,
+                stdout,
+                stderr,
+            }) => (false, exit_code, stdout, stderr),
             Err(e) => return Err(e),
         };
 
-        // 8. ログ解析と診断情報の抽出。
-        let full_log = format!("{}\n{}", stdout, stderr);
+        // 8. ログ解析と診断情報の抽出(ディスク上の`.log`ファイルも併読)。
+        let log_file_path = workdir.join(format!("{stem}.log"));
+        let disk_log = fs::read_to_string(&log_file_path).unwrap_or_default();
+        let full_log = if disk_log.is_empty() {
+            format!("{}\n{}", stdout, stderr)
+        } else {
+            format!("{}\n{}\n{}", stdout, stderr, disk_log)
+        };
         let log_summary = self.parser.parse(&full_log);
 
         let pdf_path = sandbox.get_pdf_path(&request.kind, stem);

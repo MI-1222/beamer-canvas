@@ -21,6 +21,8 @@ pub enum RenderError {
     CompileFailed {
         /// プロセスの終了コード。
         exit_code: Option<i32>,
+        /// 標準出力ログ内容。
+        stdout: String,
         /// 標準エラー出力またはログ内容。
         stderr: String,
     },

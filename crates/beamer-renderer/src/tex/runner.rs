@@ -172,6 +172,7 @@ impl TexRunner {
                 if !success {
                     return Err(RenderError::CompileFailed {
                         exit_code,
+                        stdout: stdout_str,
                         stderr: stderr_str,
                     });
                 }

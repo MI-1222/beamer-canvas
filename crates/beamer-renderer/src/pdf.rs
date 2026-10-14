@@ -151,7 +151,7 @@ fn find_pdfium_library_fallback() -> Option<std::path::PathBuf> {
         }
     }
 
-    // 3. カレントディレクトリおよびビルド出力ディレクトリ
+    // 3. カレントディレクトリおよびビルド出力ディレクトリ。
     let local_candidates = [
         PathBuf::from(&library_name),
         PathBuf::from("target/debug").join(&library_name),
@@ -161,7 +161,137 @@ fn find_pdfium_library_fallback() -> Option<std::path::PathBuf> {
         PathBuf::from("../../target/debug").join(&library_name),
         PathBuf::from("../../target/release").join(&library_name),
     ];
-    local_candidates.into_iter().find(|p| p.exists())
+    if let Some(found) = local_candidates.into_iter().find(|p| p.exists()) {
+        return Some(found);
+    }
+
+    // 4. プラットフォーム固有のシステムパスおよびユーザーディレクトリの探索。
+    find_platform_specific_pdfium(&library_name)
+}
+
+/// `macOS`向けのシステムおよびユーザーライブラリパスを探索する。
+#[cfg(target_os = "macos")]
+fn find_platform_specific_pdfium(library_name: &std::ffi::OsStr) -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+
+    // `Homebrew`および標準システムパス。
+    let system_candidates = [
+        PathBuf::from("/opt/homebrew/lib").join(library_name),
+        PathBuf::from("/usr/local/lib").join(library_name),
+        PathBuf::from("/usr/lib").join(library_name),
+    ];
+    if let Some(found) = system_candidates.into_iter().find(|p| p.exists()) {
+        return Some(found);
+    }
+
+    // `macOS`ユーザーディレクトリ配下の`Python`パッケージ等。
+    if let Ok(home) = std::env::var("HOME") {
+        let home_path = PathBuf::from(home);
+        let user_candidates = [
+            home_path.join(".local/lib").join(library_name),
+            home_path
+                .join("Library/Python/3.13/lib/python/site-packages/pypdfium2_raw")
+                .join(library_name),
+            home_path
+                .join("Library/Python/3.12/lib/python/site-packages/pypdfium2_raw")
+                .join(library_name),
+            home_path
+                .join("Library/Python/3.11/lib/python/site-packages/pypdfium2_raw")
+                .join(library_name),
+            home_path
+                .join("Library/Python/3.10/lib/python/site-packages/pypdfium2_raw")
+                .join(library_name),
+        ];
+        if let Some(found) = user_candidates.into_iter().find(|p| p.exists()) {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
+/// `Linux`向けのシステムおよびユーザーライブラリパスを探索する。
+#[cfg(target_os = "linux")]
+fn find_platform_specific_pdfium(library_name: &std::ffi::OsStr) -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+
+    // `Linux`標準システムパスおよびマルチアーキテクチャパス。
+    let system_candidates = [
+        PathBuf::from("/usr/lib").join(library_name),
+        PathBuf::from("/usr/local/lib").join(library_name),
+        PathBuf::from("/usr/lib/x86_64-linux-gnu").join(library_name),
+        PathBuf::from("/usr/lib/aarch64-linux-gnu").join(library_name),
+    ];
+    if let Some(found) = system_candidates.into_iter().find(|p| p.exists()) {
+        return Some(found);
+    }
+
+    // `Linux`ユーザーディレクトリ配下。
+    if let Ok(home) = std::env::var("HOME") {
+        let home_path = PathBuf::from(home);
+        let user_candidates = [
+            home_path.join(".local/lib").join(library_name),
+            home_path
+                .join(".local/lib/python3.13/site-packages/pypdfium2_raw")
+                .join(library_name),
+            home_path
+                .join(".local/lib/python3.12/site-packages/pypdfium2_raw")
+                .join(library_name),
+            home_path
+                .join(".local/lib/python3.11/site-packages/pypdfium2_raw")
+                .join(library_name),
+            home_path
+                .join(".local/lib/python3.10/site-packages/pypdfium2_raw")
+                .join(library_name),
+        ];
+        if let Some(found) = user_candidates.into_iter().find(|p| p.exists()) {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
+/// `Windows`向けのシステムおよびユーザーライブラリパスを探索する。
+#[cfg(target_os = "windows")]
+fn find_platform_specific_pdfium(library_name: &std::ffi::OsStr) -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+
+    // `Windows`システムパス。
+    if let Ok(system_root) = std::env::var("SystemRoot") {
+        let p = PathBuf::from(system_root)
+            .join("System32")
+            .join(library_name);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+
+    // `Windows`ユーザーディレクトリ配下の`Python`パッケージ等。
+    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        let base = PathBuf::from(local_app_data)
+            .join("Programs")
+            .join("Python");
+        for ver in &["Python313", "Python312", "Python311", "Python310"] {
+            let p = base
+                .join(ver)
+                .join("Lib")
+                .join("site-packages")
+                .join("pypdfium2_raw")
+                .join(library_name);
+            if p.exists() {
+                return Some(p);
+            }
+        }
+    }
+
+    None
+}
+
+/// その他の未対応プラットフォーム向けフォールバック。
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+fn find_platform_specific_pdfium(_library_name: &std::ffi::OsStr) -> Option<std::path::PathBuf> {
+    None
 }
 
 /// PDF ドキュメントのスレッドセーフなラスタライザ。

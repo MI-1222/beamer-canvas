@@ -51,8 +51,17 @@ impl SlideMappingTable {
             } else {
                 for s in &entry.steps {
                     let page_0based = s.physical_page.saturating_sub(1);
-                    step_to_page.push(page_0based);
+                    if !step_to_page.contains(&page_0based) {
+                        step_to_page.push(page_0based);
+                    }
                 }
+                // `pause`マクロ等により中間の`slideentry`が出力されていない場合、`start_page..=end_page`の全ページを補完する。
+                for p in start_page..=end_page {
+                    if !step_to_page.contains(&p) {
+                        step_to_page.push(p);
+                    }
+                }
+                step_to_page.sort();
             }
 
             let step_count = step_to_page
